@@ -1,29 +1,23 @@
 import click
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import astropy.units as u
-from astropy.coordinates import cartesian_to_spherical, Angle
+from astropy.coordinates import Angle
 from matplotlib.colors import LogNorm
+import fact.io
 
 
 @click.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path(exists=False))
-def main(input_file, output_file):
-    df = pd.read_csv(input_file).dropna()
+@click.argument('input_dl3_file', type=click.Path(exists=True))
+@click.option('-o', '--output', type=click.Path(exists=False))
+def main(input_dl3_file, output):
+    df = fact.io.read_data(input_dl3_file, key='events').dropna()
 
-    x = df['stereo:estimated_direction:x']
-    y = df['stereo:estimated_direction:y']
-    z = df['stereo:estimated_direction:z']
+    alt = Angle(df.alt_prediction.values * u.rad).degree
+    mc_alt = Angle(df.mc_alt.values * u.rad).degree
 
-    r, lat, lon = cartesian_to_spherical(x.values * u.m, y.values * u.m, z.values * u.m)
-
-    alt = Angle(90 * u.deg - lat).degree
-    mc_alt = Angle(df['mc:alt'].values * u.rad).degree
-
-    az = Angle(lon).wrap_at(180 * u.deg).degree
-    mc_az = Angle(df['mc:az'].values * u.rad).wrap_at(180 * u.deg).degree
+    az = Angle(df.az_prediction.values * u.rad).wrap_at(180 * u.deg).degree
+    mc_az = Angle(df.mc_az.values * u.rad).wrap_at(180 * u.deg).degree
 
     distance = np.sqrt((alt - mc_alt)**2 + (az - mc_az)**2)
     resolution = np.percentile(distance, 68)
@@ -33,7 +27,6 @@ def main(input_file, output_file):
     (_, _, _, im) = ax1.hist2d(
         alt, az, range=[[69.5, 70.5], [-0.4, 0.4]], bins=200, cmap='viridis',
     )
-    # ax1.set_xlabel('Altitude')
 
     ax1.set_ylabel('Azimuth')
     ax1.set_ylim([-0.2, 0.2])
@@ -59,7 +52,10 @@ def main(input_file, output_file):
              )
     fig.colorbar(im, ax=ax2)
 
-    plt.savefig(output_file)
+    if output:
+        plt.savefig(output)
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":

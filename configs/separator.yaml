@@ -1,0 +1,25 @@
+classifier : |
+  ensemble.RandomForestClassifier(
+      n_estimators=200,
+      max_features='sqrt',
+      n_jobs=-1,
+      max_depth=10,
+      criterion='entropy',
+  )
+
+# n_background: 12000
+# n_signal: 12000
+
+n_cross_validations : 5
+
+telescope_type_key: telescope_type_name
+
+training_variables:
+  - num_triggered_telescopes
+  - width
+  - length
+  - skewness
+  - kurtosis
+  - intensity
+  - camera_id
+  - telescope_type_id
