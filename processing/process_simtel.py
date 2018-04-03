@@ -7,11 +7,13 @@ import fact.io
 import click
 from tqdm import tqdm
 import numpy as np
+import os
+import pyhessio
 
 
 names_to_id = {'LSTCam': 1, 'NectarCam': 2, 'FlashCam': 3, 'DigiCam': 4, 'CHEC': 5}
 types_to_id = {'LST': 1, 'MST': 2, 'SST': 3}
-allowed_cameras = ['LSTCam', 'FlashCam', 'DigiCam']
+allowed_cameras = ['LSTCam', 'NectarCam', 'DigiCam']
 
 
 @click.command()
@@ -26,10 +28,25 @@ allowed_cameras = ['LSTCam', 'FlashCam', 'DigiCam']
     ))
 @click.option('-n', '--n_events', default=-1)
 def main(input_files, output_file, n_events):
+    '''
+    process multiple simtel files into one hdf containing three groups.
+    'runs', 'array_events', 'telescope_events'
+    '''
+
+    if os.path.exists(output_file):
+        click.confirm(f'File {output_file} exists. Overwrite?', default=False, abort=True)
+        os.remove(output_file)
+
+    run_information = []
     count = 0
     for input_file in input_files:
         print(f'processing file {input_file}')
+        run_information.append(read_simtel_mc_information(input_file))
         count += process_file(input_file, output_file, n_events)
+
+    df_runs = pd.DataFrame(run_information)
+    df_runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
+    fact.io.write_data(df_runs, output_file, key='runs')
 
     print(f'Processed {count} (telescope-wise) events in total.')
 
@@ -44,21 +61,73 @@ def process_file(input_file, output_file, n_events):
         event_source=event_source,
     )
 
-    event_information = []
+
+    image_features = []
+    array_event_information = []
     for event in tqdm(event_source):
         if number_of_valid_triggerd_cameras(event) >= 2:
-            event_parameter = process_event(event, calibrator)
-            event_information.extend(event_parameter)
+            array_event_information.append(event_information(event))
+            image_features.extend(calculate_image_features(event, calibrator))
 
-    df = pd.DataFrame(event_information)
-    df.set_index('telescope_event_id', drop=True, verify_integrity=True, inplace=True)
-    fact.io.write_data(df, output_file, key='events', mode='a')
-    return len(df)
+    df_features = pd.DataFrame(image_features)
+    df_features.set_index('telescope_event_id', drop=True, verify_integrity=True, inplace=True)
+    fact.io.write_data(df_features, output_file, key='telescope_events', mode='a')
+
+    df_array = pd.DataFrame(array_event_information)
+    df_array.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
+    fact.io.write_data(df_array, output_file, key='array_events', mode='a')
+    return len(df_features)
 
 
-def process_event(event, calibrator):
+def read_simtel_mc_information(simtel_file):
+    with pyhessio.open_hessio(simtel_file) as f:
+        # do some weird hessio fuckup
+        eventstream = f.move_to_next_event()
+        _ = next(eventstream)
+
+        d = {
+            'mc_spectral_index': f.get_spectral_index(),
+            'mc_num_reuse': f.get_mc_num_use(),
+            'mc_num_showers': f.get_mc_num_showers(),
+            'mc_max_energy': f.get_mc_E_range_Max(),
+            'mc_min_energy': f.get_mc_E_range_Min(),
+            'mc_max_scatter_range': f.get_mc_core_range_Y(),  # range_X is always 0 in simtel files
+            'mc_max_viewcone_radius': f.get_mc_viewcone_Max(),
+            'mc_min_viewcone_radius': f.get_mc_viewcone_Min(),
+            'run_id': f.get_run_number(),
+            'mc_max_altitude': f.get_mc_alt_range_Max(),
+            'mc_max_azimuth': f.get_mc_az_range_Max(),
+            'mc_min_altitude': f.get_mc_alt_range_Min(),
+            'mc_min_azimuth': f.get_mc_az_range_Min(),
+        }
+
+        return d
+
+
+def event_information(event):
+    d = {
+        'mc_alt': event.mc.alt,
+        'mc_az': event.mc.az,
+        'mc_core_x': event.mc.core_x,
+        'mc_core_y': event.mc.core_y,
+        'num_triggered_telescopes': number_of_valid_triggerd_cameras(event),
+        'mc_height_first_interaction': event.mc.h_first_int,
+        'mc_energy': event.mc.energy.to('TeV').value,
+        'mc_corsika_primary_id': event.mc.shower_primary_id,
+        'run_id': event.r0.obs_id,
+        'array_event_id': generate_unique_array_event_id(event),
+    }
+
+    return {k: strip_unit(v) for k, v in d.items()}
+
+
+def calculate_image_features(event, calibrator):
+    '''
+    Processes
+    '''
     event_info = []
     calibrator.calibrate(event)
+
     for telescope_id, dl1 in event.dl1.tel.items():
         camera = event.inst.subarray.tels[telescope_id].camera
         if camera.cam_id not in allowed_cameras:
@@ -79,16 +148,9 @@ def process_event(event, calibrator):
             'telescope_id': int(telescope_id),
             'camera_name': camera.cam_id,
             'camera_id': names_to_id[camera.cam_id],
-            'mc_alt': event.mc.alt,
-            'mc_az': event.mc.az,
-            'mc_core_x': event.mc.core_x,
-            'mc_core_y': event.mc.core_y,
-            'mc_energy': event.mc.energy.to('TeV').value,
-            'num_triggered_telescopes': number_of_valid_triggerd_cameras(event),
-            'mc_height_first_interaction': event.mc.h_first_int,
+            'run_id': event.r0.obs_id,
             'telescope_type_name': telescope_type_name,
             'telescope_type_id': types_to_id[telescope_type_name],
-            'mc_corsika_primary_id': event.mc.shower_primary_id,
             'pointing_azimuth': event.mc.tel[telescope_id].azimuth_raw,
             'pointing_altitude': ((np.pi / 2) - event.mc.tel[telescope_id].altitude_raw),
         }

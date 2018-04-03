@@ -3,8 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import astropy.units as u
-from astropy.coordinates import Angle, SkyCoord, EarthLocation
-from dateutil import parser
+from astropy.coordinates import Angle
 from scipy.stats import binned_statistic
 import fact.io
 
@@ -22,29 +21,6 @@ def main(input_dl3_file, output):
     mc_az = Angle(df.mc_az.values * u.rad).wrap_at(180 * u.deg).degree
 
     distance = np.sqrt((alt - mc_alt)**2 + (az - mc_az)**2)
-
-    #
-    # paranal = EarthLocation.of_site('paranal')
-    # dt = parser.parse('1987-09-20 22:15')
-    #
-    # c = SkyCoord(
-    #     alt=alt,
-    #     az=az,
-    #     obstime=dt,
-    #     frame='altaz',
-    #     location=paranal,
-    # )
-    #
-    # c_mc = SkyCoord(
-    #     alt=mc_alt,
-    #     az=mc_az,
-    #     obstime=dt,
-    #     frame='altaz',
-    #     location=paranal,
-    # )
-    #
-    # df['spherical_distance'] = c.separation(c_mc)
-
 
     bins = np.logspace(np.log10(df.mc_energy.min()), np.log10(df.mc_energy.max()), 10)
     df['energy_bin'] = pd.cut(df.mc_energy, bins)

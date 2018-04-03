@@ -9,7 +9,7 @@ import pandas as pd
 import warnings
 from astropy.utils.exceptions import AstropyDeprecationWarning
 
-
+# do some horrible things to silencece astropy warnings in ctapipe
 warnings.filterwarnings('ignore', category=AstropyDeprecationWarning, append=True)
 warnings.filterwarnings('ignore', category=FutureWarning, append=True)
 
@@ -35,8 +35,11 @@ SubMomentParameters = namedtuple('SubMomentParameters', 'size,cen_x,cen_y,length
 def main(predicted_events, instrument_description, output_file):
     reco = HillasReconstructor()
     instrument = pickle.load(open(instrument_description, 'rb'))
-    events = fact.io.read_data(predicted_events, key='events')
+    telescope_events = fact.io.read_data(predicted_events, key='telescope_events')
+    array_events = fact.io.read_data(predicted_events, key='array_events')
+    events = pd.merge(left=array_events, right=telescope_events, on='array_event_id')
 
+    # the data in each event has to be put inside these namedtuples to call the reco.predict method.
     results = []
     for array_event_id, group in tqdm(events.groupby('array_event_id')):
         params = {}

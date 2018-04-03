@@ -20,11 +20,14 @@ def main(input_dl3_file, output):
 
     distance = np.sqrt((alt - mc_alt)**2 + (az - mc_az)**2)
     resolution = np.percentile(distance, 68)
+    print(f'Plotting a total {len(df)} events')
 
     plt.hist(distance, bins=np.linspace(0, 0.2, 100))
     plt.axvline(resolution, color='gray', linestyle='--', label='0.68 percentile')
     plt.xlabel('$\Delta \phi \; in \;  degrees$')
     plt.legend()
+
+
 
     if output:
         plt.savefig(output)
