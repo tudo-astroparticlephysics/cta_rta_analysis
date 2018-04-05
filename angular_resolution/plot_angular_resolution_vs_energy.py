@@ -24,22 +24,17 @@ def main(input_dl3_file, output):
 
     bins = np.logspace(np.log10(df.mc_energy.min()), np.log10(df.mc_energy.max()), 10)
     df['energy_bin'] = pd.cut(df.mc_energy, bins)
-    #
+
     x = df.mc_energy.values
-    #
     y = distance
-    #
 
     bin_means, bin_edges, binnumber = binned_statistic(x, y, statistic='median', bins=bins)
 
     b_68, bin_edges, binnumber = binned_statistic(x, y, statistic=lambda y: np.percentile(y, 68), bins=bins)
     b_32, bin_edges, binnumber = binned_statistic(x, y, statistic=lambda y: np.percentile(y, 32), bins=bins)
-    # print(b_68)
-    # print(b_32)
-    # # bin_width = (bin_edges[1] - bin_edges[0])
+
     bin_centers = np.sqrt(bin_edges[1:] * bin_edges[:-1])
-    #
-    # # plt.errorbar(bin_centers, bin_means, yerr=[b_95, b_05], xerr=bin_width/2, elinewidth=2, lw=0, ecolor='#348ABD')
+
     plt.scatter(x, y, s=0.2, color='#909090')
     plt.hlines(bin_means, bin_edges[:-1], bin_edges[1:], lw=1, colors='#0a4f88')
     c = bin_centers

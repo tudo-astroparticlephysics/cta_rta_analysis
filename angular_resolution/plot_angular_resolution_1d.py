@@ -10,7 +10,7 @@ import fact.io
 @click.argument('input_dl3_file', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(exists=False))
 def main(input_dl3_file, output):
-    df = fact.io.read_data(input_dl3_file, key='events').dropna()
+    df = fact.io.read_data(input_dl3_file, key='array_events')
 
     alt = Angle(df.alt_prediction.values * u.rad).degree
     mc_alt = Angle(df.mc_alt.values * u.rad).degree
@@ -26,8 +26,6 @@ def main(input_dl3_file, output):
     plt.axvline(resolution, color='gray', linestyle='--', label='0.68 percentile')
     plt.xlabel('$\Delta \phi \; in \;  degrees$')
     plt.legend()
-
-
 
     if output:
         plt.savefig(output)

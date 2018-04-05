@@ -26,6 +26,7 @@ model_regressor = $(build_dir)/regressor.pkl
 config_regressor = configs/regressor.yaml
 
 gamma_dl3 = $(build_dir)/gamma_dl3.hdf5
+proton_dl3 = $(build_dir)/proton_dl3.hdf5
 
 # all: $(proton_test) $(proton_train) $(gamma_test) $(gamma_train) ../build/ANGULAR ../build/COLLECTION ../build/ML_PERF ../build/SENSITIVITY
 
@@ -51,7 +52,7 @@ $(model_regressor) $(predictions): $(gamma_train) $(config_regressor)
 	klaas_train_energy_regressor $(config_regressor) $(gamma_train) $(predictions_regressor) $(model_regressor)
 
 
-$(build_dir)/APPLICATION_DONE: $(proton_train) $(gamma_train) $(model_separator) $(config_separator)
+$(build_dir)/APPLICATION_DONE: $(proton_train) $(gamma_train) $(model_separator) $(config_separator) $(gamma_test) $(proton_test)
 	klaas_apply_separation_model $(config_separator) $(gamma_test) $(model_separator) --yes
 	klaas_apply_separation_model $(config_separator) $(proton_test) $(model_separator) --yes
 	klaas_apply_energy_regressor $(config_regressor) $(gamma_test) $(model_regressor) --yes
@@ -68,15 +69,20 @@ $(plot_overview_regressor): $(model_regressor) $(predictions_regressor) matplotl
 
 
  # plot a roc curve
-$(plot_roc): $(model_separator) matplotlibrc ml/plot_multi_tel_auc.py $(build_dir)/APPLICATION_DONE
+$(plot_roc): $(proton_test) matplotlibrc ml/plot_multi_tel_auc.py $(build_dir)/APPLICATION_DONE
 	python ml/plot_multi_tel_auc.py $(gamma_test) $(proton_test) -o $(plot_roc)
 	# plot a prediction hists
-$(plot_hists): $(model_separator) matplotlibrc ml/plot_prediction_hists.py $(build_dir)/APPLICATION_DONE
+$(plot_hists):$(gamma_test) matplotlibrc ml/plot_prediction_hists.py $(build_dir)/APPLICATION_DONE
 	python ml/plot_prediction_hists.py $(gamma_test) $(proton_test) -o $(plot_hists)
 
 
 	# reconstruct direction
-$(gamma_dl3): $(model_regressor) matplotlibrc processing/reconstruct_direction.py $(build_dir)/APPLICATION_DONE
-	python processing/reconstruct_direction.py $(gamma_test) ./processing/instrument_description.pkl $(gamma_dl3)
+$(gamma_dl3) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3) ./processing/instrument_description.pkl
+
+$(proton_dl3) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3) ./processing/instrument_description.pkl
+
+
 $(plot_angular_resolution): $(gamma_dl3)
 	python angular_resolution/plot_angular_resolution_1d.py $(gamma_dl3) -o $(plot_angular_resolution)

@@ -5,8 +5,6 @@ from ctapipe.image.cleaning import tailcuts_clean
 import pandas as pd
 import fact.io
 import click
-from tqdm import tqdm
-import numpy as np
 import os
 import pyhessio
 
@@ -37,21 +35,14 @@ def main(input_files, output_file, n_events):
         click.confirm(f'File {output_file} exists. Overwrite?', default=False, abort=True)
         os.remove(output_file)
 
-    run_information = []
-    count = 0
     for input_file in input_files:
         print(f'processing file {input_file}')
-        run_information.append(read_simtel_mc_information(input_file))
-        count += process_file(input_file, output_file, n_events)
+        process_file(input_file, output_file, n_events)
 
-    df_runs = pd.DataFrame(run_information)
-    df_runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
-    fact.io.write_data(df_runs, output_file, key='runs')
-
-    print(f'Processed {count} (telescope-wise) events in total.')
+    verify_file(output_file)
 
 
-def process_file(input_file, output_file, n_events):
+def process_file(input_file, output_file, n_events=-1):
     event_source = EventSourceFactory.produce(
         input_url=input_file,
         max_events=n_events if n_events > 1 else None,
@@ -64,7 +55,7 @@ def process_file(input_file, output_file, n_events):
 
     image_features = []
     array_event_information = []
-    for event in tqdm(event_source):
+    for event in event_source:
         if number_of_valid_triggerd_cameras(event) >= 2:
             array_event_information.append(event_information(event))
             image_features.extend(calculate_image_features(event, calibrator))
@@ -76,7 +67,30 @@ def process_file(input_file, output_file, n_events):
     df_array = pd.DataFrame(array_event_information)
     df_array.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
     fact.io.write_data(df_array, output_file, key='array_events', mode='a')
-    return len(df_features)
+
+    run_information = read_simtel_mc_information(input_file)
+
+    df_runs = pd.DataFrame([run_information])
+    df_runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
+    fact.io.write_data(df_runs, output_file, key='runs', mode='a')
+
+
+
+def verify_file(input_file_path):
+    runs = fact.io.read_data(input_file_path, key='runs')
+    runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
+
+    telescope_events = fact.io.read_data(input_file_path, key='telescope_events')
+    telescope_events.set_index('telescope_event_id', drop=True, verify_integrity=True, inplace=True)
+
+    array_events = fact.io.read_data(input_file_path, key='array_events')
+    array_events.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
+
+    assert len(array_events) == len(telescope_events.array_event_id.unique())
+    assert len(runs) == len(telescope_events.run_id.unique())
+    assert len(runs) == len(array_events.run_id.unique())
+
+    print(f'Processed {len(runs)} runs, {len(telescope_events)} single telescope events and {len(array_events)} array events.')
 
 
 def read_simtel_mc_information(simtel_file):
@@ -152,7 +166,7 @@ def calculate_image_features(event, calibrator):
             'telescope_type_name': telescope_type_name,
             'telescope_type_id': types_to_id[telescope_type_name],
             'pointing_azimuth': event.mc.tel[telescope_id].azimuth_raw,
-            'pointing_altitude': ((np.pi / 2) - event.mc.tel[telescope_id].altitude_raw),
+            'pointing_altitude': event.mc.tel[telescope_id].altitude_raw,
         }
 
         d.update(hillas_params.as_dict())
@@ -166,7 +180,7 @@ def generate_unique_array_event_id(event):
 
 
 def generate_unique_telescope_event_id(event, telescope_id):
-    return (event.r0.obs_id << 10) + (event.r0.event_id << 8) + (event.count << 4) + telescope_id
+    return (event.r0.obs_id << 32) + (event.r0.event_id << 16) + (event.count << 12) + telescope_id
 
 
 def number_of_valid_triggerd_cameras(event):
