@@ -7,7 +7,7 @@ import fact.io
 import click
 import os
 import pyhessio
-
+import numpy as np
 
 names_to_id = {'LSTCam': 1, 'NectarCam': 2, 'FlashCam': 3, 'DigiCam': 4, 'CHEC': 5}
 types_to_id = {'LST': 1, 'MST': 2, 'SST': 3}
@@ -175,12 +175,24 @@ def calculate_image_features(event, calibrator):
     return event_info
 
 
+def pair(a, b):
+    ''' implmentation of the "elegant pairing function" http://szudzik.com/ElegantPairing.pdf '''
+    p = b**2 + a if b > a else a**2 + a + b
+    try:
+        is_valid_numpy_int = p.dtype in [np.int16, np.int32, np.int64]
+        if is_valid_numpy_int:
+            return p
+    except AttributeError:
+        if int(p).bit_length > 63:
+            raise ValueError(f'"{a}" and "{b}" cannot be paired. Value exceeds 64 bits.')
+        return p
+
 def generate_unique_array_event_id(event):
-    return (event.r0.obs_id << 22) + event.r0.event_id + event.count
+    return pair(event.r0.obs_id, event.r0.event_id)
 
 
 def generate_unique_telescope_event_id(event, telescope_id):
-    return (event.r0.obs_id << 32) + (event.r0.event_id << 16) + (event.count << 12) + telescope_id
+    return pair(generate_unique_array_event_id(event), telescope_id)
 
 
 def number_of_valid_triggerd_cameras(event):
