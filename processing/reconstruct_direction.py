@@ -9,6 +9,8 @@ import warnings
 from astropy.utils.exceptions import AstropyDeprecationWarning
 from joblib import Parallel, delayed
 import numpy as np
+import multiprocessing
+
 
 # do some horrible things to silencece astropy warnings in ctapipe
 warnings.filterwarnings('ignore', category=AstropyDeprecationWarning, append=True)
@@ -38,8 +40,7 @@ def dummy_function_h_max(self, hillas_dict, subarray, tel_phi):
         dir_okay=False,
     ))
 @click.option('-y', '--yes', help='Do not prompt for overwrites', is_flag=True)
-@click.option('-n', '--n_jobs', help='How many jobs to start in parallel', default=2)
-def main(input_file_path, output_file_path, instrument_description, yes, n_jobs):
+def main(input_file_path, output_file_path, instrument_description, yes):
 
     instrument = pickle.load(open(instrument_description, 'rb'))
 
@@ -55,7 +56,7 @@ def main(input_file_path, output_file_path, instrument_description, yes, n_jobs)
 
     events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id')
 
-
+    n_jobs = multiprocessing.cpu_count()
     results = Parallel(n_jobs=n_jobs, verbose=5) (delayed(reconstruct_direction)(array_event_id, group, instrument=instrument) for array_event_id, group in events.groupby('array_event_id'))
     assert len(results) == len(array_events)
     df = pd.DataFrame(results)
