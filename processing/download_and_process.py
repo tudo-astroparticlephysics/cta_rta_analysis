@@ -53,7 +53,7 @@ def main(outputfile, password, type):
         click.confirm(f'File {outputfile} exists. Overwrite?', default=False, abort=True)
         os.remove(outputfile)
 
-    links = get_links(type, password)[0:3]
+    links = get_links(type, password)
     print(f'Found {len(links)} links')
     for filename in tqdm(links):
         download_file(filename, password)
