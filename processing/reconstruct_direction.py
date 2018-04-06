@@ -7,7 +7,6 @@ import astropy.units as u
 import pandas as pd
 import warnings
 from astropy.utils.exceptions import AstropyDeprecationWarning
-import h5py
 from joblib import Parallel, delayed
 import numpy as np
 
@@ -56,7 +55,6 @@ def main(input_file_path, output_file_path, instrument_description, yes, n_jobs)
 
     events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id')
 
-    import IPython; IPython.embed()
 
     results = Parallel(n_jobs=n_jobs, verbose=5) (delayed(reconstruct_direction)(array_event_id, group, instrument=instrument) for array_event_id, group in events.groupby('array_event_id'))
     assert len(results) == len(array_events)
@@ -94,8 +92,8 @@ def reconstruct_direction(array_event_id, group, instrument):
         # the data in each event has to be put inside these namedtuples to call reco.predict
         moments = SubMomentParameters(size=row.intensity, cen_x=row.x * u.m, cen_y=row.y * u.m, length=row.length * u.m, width=row.width * u.m, psi=row.psi * u.rad)
         params[tel_id] = moments
-        pointing_azimuth[tel_id] = row.pointing_azimuth * u.deg
-        pointing_altitude[tel_id] = row.pointing_altitude * u.deg
+        pointing_azimuth[tel_id] = row.pointing_azimuth * u.rad
+        pointing_altitude[tel_id] = row.pointing_altitude * u.rad
 
 
     reconstruction = reco.predict(params, instrument, pointing_azimuth, pointing_altitude)
@@ -103,7 +101,7 @@ def reconstruct_direction(array_event_id, group, instrument):
         print('Not reconstructed')
         print(params)
 
-    return {'alt_prediction': reconstruction.alt.si.value,
+    return {'alt_prediction': ((np.pi / 2) - reconstruction.alt.si.value),  # TODO srsly now? FFS
             'az_prediction': reconstruction.az.si.value,
             'core_x_prediction': reconstruction.core_x.si.value,
             'core_y_prediction': reconstruction.core_y.si.value,

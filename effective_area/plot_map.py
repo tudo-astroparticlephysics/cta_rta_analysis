@@ -4,20 +4,11 @@ import matplotlib.pyplot as plt
 import astropy.units as u
 import fact.io
 from astropy.coordinates import Angle
-from coordinates import horizontal_to_skycoord
+from coordinates import horizontal_to_skycoord, wrap_angles
 from spectrum import MCSpectrum, CrabSpectrum, CosmicRaySpectrum
 
 
-
-def calculate_distance(df):
-    alt = Angle(df.alt_prediction.values * u.rad).degree
-    mc_alt = Angle(df.mc_alt.values * u.rad).degree
-
-    az = Angle(df.az_prediction.values * u.rad).wrap_at(180 * u.deg).degree
-    mc_az = Angle(df.mc_az.values * u.rad).wrap_at(180 * u.deg).degree
-
-    return np.sqrt((alt - mc_alt)**2 + (az - mc_az)**2)
-
+#
 
 @click.command()
 @click.argument('gammas_dl3', type=click.Path(exists=True))
@@ -59,7 +50,8 @@ def main(gammas_dl3, protons_dl3, output):
 
     ra = c.icrs.ra
     dec = c.icrs.dec
-    ax1.scatter(ra.degree, dec.degree, label='proton', s=2, alpha=0.5)
+    # ax1.scatter(ra.degree, dec.degree, label='proton', s=2, alpha=0.5)
+    ax1.scatter(*wrap_angles(alt, az), label=f'proton ({len(az)})', s=2, alpha=0.5)
 
     az = gammas.mc_az.values * u.rad
     alt = gammas.mc_alt.values * u.rad
@@ -67,8 +59,9 @@ def main(gammas_dl3, protons_dl3, output):
 
     ra = c.icrs.ra
     dec = c.icrs.dec
-    ax1.scatter(ra.degree, dec.degree, label='gamma', s=2, alpha=0.5)
-
+    # ax1.scatter(ra.degree, dec.degree, label='gamma', s=2, alpha=0.5)
+    ax1.scatter(*wrap_angles(alt, az), label=f'gamma ({len(az)})', s=8, alpha=0.5)
+    ax1.set_title('True Direction')
 
 
     az = protons.az_prediction.values * u.rad
@@ -77,21 +70,24 @@ def main(gammas_dl3, protons_dl3, output):
 
     ra = c.icrs.ra
     dec = c.icrs.dec
-    ax2.scatter(ra.degree, dec.degree, label='proton', s=2, alpha=0.5)
+    # ax2.scatter(ra.degree, dec.degree, label='proton', s=2, alpha=0.5)
+    ax2.scatter(*wrap_angles(alt, az), label=f'proton ({len(az)})', s=2, alpha=0.5)
 
     az = gammas.az_prediction.values * u.rad
     alt = gammas.alt_prediction.values * u.rad
+
     c = horizontal_to_skycoord(alt, az)
 
     ra = c.icrs.ra
     dec = c.icrs.dec
-    ax2.scatter(ra.degree, dec.degree, label='gamma', s=2, alpha=0.5)
-
-
-    ax1.set_xlim([10, 20])
-    ax1.set_ylim([40, 50])
-    ax2.set_xlim([10, 20])
-    ax2.set_ylim([40, 50])
+    # ax2.scatter(ra.degree, dec.degree, label='gamma', s=2, alpha=0.5)
+    ax2.scatter(*wrap_angles(alt, az), label=f'gamma ({len(az)})', s=2, alpha=0.5)
+    ax2.set_title('Reconstruncted Direction')
+    #
+    # ax1.set_xlim([10, 20])
+    # ax1.set_ylim([40, 50])
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_ylim(ax1.get_ylim())
     # az = protons.az_prediction.values * u.deg
     # alt = protons.alt_prediction.values * u.deg
     # c_proton = horizontal_to_skycoord(alt, az)
@@ -99,10 +95,15 @@ def main(gammas_dl3, protons_dl3, output):
     # ra = c_proton.icrs.ra
     # dec = c_proton.icrs.dec
     # plt.scatter(ra.degree, dec.degree, label='proton_prediction', s=1, alpha=0.5)
+    ax2.set_xlabel('alt')
+    ax2.set_ylabel('az')
+
+    ax1.set_xlabel('alt')
+    ax1.set_ylabel('az')
 
 
-
-    plt.legend()
+    ax1.legend()
+    ax2.legend()
 
     if output:
         plt.savefig(output)
