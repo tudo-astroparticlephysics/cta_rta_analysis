@@ -7,6 +7,7 @@ plot_overview_regressor = $(build_dir)/regressor_performance.pdf
 plot_roc = $(build_dir)/roc.pdf
 plot_hists = $(build_dir)/hists.pdf
 plot_angular_resolution = $(build_dir)/angular_resolution_1d.pdf
+plot_map = $(build_dir)/map.pdf
 
 gamma_output = $(data_dir)/dl2/gammas.hdf5
 proton_output = $(data_dir)/dl2/protons.hdf5
@@ -30,7 +31,7 @@ proton_dl3 = $(build_dir)/proton_dl3.hdf5
 
 # all: $(proton_test) $(proton_train) $(gamma_test) $(gamma_train) ../build/ANGULAR ../build/COLLECTION ../build/ML_PERF ../build/SENSITIVITY
 
-all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution)
+all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_map)
 
 clean:
 	rm -rf $(build_dir)
@@ -86,3 +87,6 @@ $(proton_dl3) : matplotlibrc processing/reconstruct_direction.py
 
 $(plot_angular_resolution): $(gamma_dl3)
 	python angular_resolution/plot_angular_resolution_1d.py $(gamma_dl3) -o $(plot_angular_resolution)
+
+$(plot_map): $(gamma_dl3) $(proton_dl3)
+	python effective_area/plot_map.py $(gamma_dl3) $(proton_dl3) -o $(plot_map)

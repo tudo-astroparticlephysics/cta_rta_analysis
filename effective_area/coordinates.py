@@ -4,9 +4,9 @@ from astropy.coordinates import EarthLocation, Latitude, Longitude
 from dateutil import parser
 
 
-def _wrap_angles(alt, az):
+def wrap_angles(alt, az):
     alt = alt.to('degree')
-    az = Angle(az).wrap_at(180 * u.deg)
+    az = Angle(az).wrap_at(180 * u.deg).degree * u.deg
 
     return alt, az
 
@@ -14,7 +14,7 @@ def _wrap_angles(alt, az):
 @u.quantity_input(alt1=u.rad, az1=u.rad)
 def horizontal_to_skycoord(alt, az, location=None, dt=None):
 
-    alt, az = _wrap_angles(alt, az)
+    alt, az = wrap_angles(alt, az)
 
     lat = Latitude((24, 37, 38), unit='deg')
     lon = Longitude((70, 34, 15), unit='deg')
@@ -36,8 +36,8 @@ def horizontal_to_skycoord(alt, az, location=None, dt=None):
 @u.quantity_input(alt1=u.rad, az1=u.rad, alt2=u.rad, az2=u.rad,)
 def distance_between_horizontal_coordinates(alt1, az1, alt2, az2):
 
-    alt, az = _wrap_angles(alt1, az1)
-    mc_alt, mc_az = _wrap_angles(alt2, az2)
+    alt, az = wrap_angles(alt1, az1)
+    mc_alt, mc_az = wrap_angles(alt2, az2)
 
     lat = Latitude((24, 37, 38), unit='deg')
     lon = Longitude((70, 34, 15), unit='deg')
