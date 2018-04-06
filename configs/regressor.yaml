@@ -7,7 +7,7 @@ regressor : |
     max_depth=12,
   )
 
-n_signal: 30000
+n_signal: 3000
 
 telescope_type_key: telescope_type_name
 telescope_events_key: telescope_events

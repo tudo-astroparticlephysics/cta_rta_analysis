@@ -69,15 +69,16 @@ $(plot_overview_regressor): $(model_regressor) $(predictions_regressor) matplotl
 	klaas_plot_regressor_performance $(config_regressor) $(predictions_regressor) $(model_regressor) -o $(plot_overview_regressor)
 
 
- # plot a roc curve
+# plot a roc curve
 $(plot_roc): $(proton_test) matplotlibrc ml/plot_multi_tel_auc.py $(build_dir)/APPLICATION_DONE
 	python ml/plot_multi_tel_auc.py $(gamma_test) $(proton_test) -o $(plot_roc)
-	# plot a prediction hists
+
+# plot a prediction hists
 $(plot_hists):$(gamma_test) matplotlibrc ml/plot_prediction_hists.py $(build_dir)/APPLICATION_DONE
 	python ml/plot_prediction_hists.py $(gamma_test) $(proton_test) -o $(plot_hists)
 
 
-	# reconstruct direction
+# reconstruct direction
 $(gamma_dl3) : matplotlibrc processing/reconstruct_direction.py
 	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3) ./processing/instrument_description.pkl
 

@@ -24,7 +24,7 @@ from cycler import cycler
 def main(predicted_gammas, predicted_protons, output_file):
     bins = np.linspace(0, 1, 100)
 
-    gammas = fact.io.read_data(predicted_gammas, key='telescope_events')
+    gammas = fact.io.read_data(predicted_gammas, key='telescope_events').dropna()
 
     fig, ax = plt.subplots(1)
     for name, group in gammas.groupby('telescope_type_name'):
@@ -33,7 +33,7 @@ def main(predicted_gammas, predicted_protons, output_file):
 
     color_cycle = cycler(color=['gray', 'darkgray', 'black'])
     ax.set_prop_cycle(color_cycle)
-    protons = fact.io.read_data(predicted_protons, key='telescope_events')
+    protons = fact.io.read_data(predicted_protons, key='telescope_events').dropna()
     for name, group in protons.groupby('telescope_type_name'):
         ax.hist(group.gamma_prediction.values, bins=bins, label=f'proton prediction {name}', histtype='step')
 

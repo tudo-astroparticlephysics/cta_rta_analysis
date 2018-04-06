@@ -14,6 +14,19 @@ types_to_id = {'LST': 1, 'MST': 2, 'SST': 3}
 allowed_cameras = ['LSTCam', 'NectarCam', 'DigiCam']
 
 
+cleaning_level = {
+                    'ASTRICam': (5, 7),  # (5, 10)?
+                    'FlashCam': (12, 15),
+                    'LSTCam': (5, 10),  # ?? (3, 6) for Abelardo...
+                    # ASWG Zeuthen talk by Abelardo Moralejo:
+                    'NectarCam': (4, 8),
+                    # "FlashCam": (4, 8),  # there is some scaling missing?
+                    'DigiCam': (3, 6),
+                    'CHEC': (2, 4),
+                    'SCTCam': (1.5, 3)
+                    }
+
+
 @click.command()
 @click.argument(
     'input_files', type=click.Path(
@@ -50,6 +63,7 @@ def process_file(input_file, output_file, n_events=-1):
 
     calibrator = CameraCalibrator(
         event_source=event_source,
+        r1_product='HESSIOR1Calibrator',
     )
 
 
@@ -148,8 +162,11 @@ def calculate_image_features(event, calibrator):
             continue
 
         telescope_type_name = event.inst.subarray.tels[telescope_id].optics.tel_type
+        picture_thresh, boundary_thresh = cleaning_level[camera.cam_id]
+        mask = tailcuts_clean(camera, dl1.image[0], boundary_thresh=boundary_thresh, picture_thresh=picture_thresh)
+        if mask.sum() < 4:
+            continue
 
-        mask = tailcuts_clean(camera, dl1.image[0], min_number_picture_neighbors=2)
         hillas_params = hillas_parameters(
             camera[mask],
             dl1.image[0, mask],

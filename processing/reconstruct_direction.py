@@ -53,7 +53,7 @@ def main(input_file_path, output_file_path, instrument_description, yes, n_jobs)
     array_events.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
 
 
-    events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id')
+    events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id').dropna()
 
 
     results = Parallel(n_jobs=n_jobs, verbose=5) (delayed(reconstruct_direction)(array_event_id, group, instrument=instrument) for array_event_id, group in events.groupby('array_event_id'))
@@ -95,8 +95,16 @@ def reconstruct_direction(array_event_id, group, instrument):
         pointing_azimuth[tel_id] = row.pointing_azimuth * u.rad
         pointing_altitude[tel_id] = row.pointing_altitude * u.rad
 
+    try:
+        reconstruction = reco.predict(params, instrument, pointing_azimuth, pointing_altitude)
+    except NameError:
+        return {'alt_prediction': np.nan,
+                'az_prediction': np.nan,
+                'core_x_prediction': np.nan,
+                'core_y_prediction': np.nan,
+                'array_event_id': array_event_id,
+        }
 
-    reconstruction = reco.predict(params, instrument, pointing_azimuth, pointing_altitude)
     if reconstruction.alt.si.value == np.nan:
         print('Not reconstructed')
         print(params)
