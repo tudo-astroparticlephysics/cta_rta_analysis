@@ -9,9 +9,9 @@ import fact.io
 @click.command()
 @click.argument('input_dl3_file', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(exists=False))
-@click.option('-b', '--bin_edges', nargs=2, help='the lowes and highest bin edges', type=float, default=(0, 0.2))
+@click.option('-b', '--bin_edges', nargs=2, help='the lowes and highest bin edges', type=float, default=(0, 5))
 def main(input_dl3_file, output, bin_edges):
-    df = fact.io.read_data(input_dl3_file, key='array_events')
+    df = fact.io.read_data(input_dl3_file, key='array_events').dropna()
 
     alt = Angle(df.alt_prediction.values * u.rad).degree
     mc_alt = Angle(df.mc_alt.values * u.rad).degree
@@ -20,12 +20,12 @@ def main(input_dl3_file, output, bin_edges):
     mc_az = Angle(df.mc_az.values * u.rad).wrap_at(180 * u.deg).degree
 
     distance = np.sqrt((alt - mc_alt)**2 + (az - mc_az)**2)
-    # resolution = np.percentile(distance, 68)
+    resolution = np.percentile(distance, 68)
     print(f'Plotting a total {len(df)} events')
 
-    plt.hist(distance, bins=np.linspace(*bin_edges, 100), color='blue')
+    plt.hist(distance, bins=np.linspace(*bin_edges, 100),)
     plt.title('Gammas')
-    # plt.axvline(resolution, color='gray', linestyle='--', label='0.68 percentile')
+    plt.axvline(resolution, color='gray', linestyle='--', label='0.68 percentile')
     plt.xlabel('Distance between true and reco position')
     plt.legend()
 

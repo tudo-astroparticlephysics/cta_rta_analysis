@@ -71,8 +71,10 @@ def process_file(input_file, output_file, n_events=-1):
     array_event_information = []
     for event in event_source:
         if number_of_valid_triggerd_cameras(event) >= 2:
-            array_event_information.append(event_information(event))
-            image_features.extend(calculate_image_features(event, calibrator))
+            f = calculate_image_features(event, calibrator)
+            if len(f) > 1:  # check whtehr at least two telescopes returned hillas features
+                array_event_information.append(event_information(event))
+                image_features.extend(f)
 
     df_features = pd.DataFrame(image_features)
     df_features.set_index('telescope_event_id', drop=True, verify_integrity=True, inplace=True)
@@ -164,7 +166,8 @@ def calculate_image_features(event, calibrator):
         telescope_type_name = event.inst.subarray.tels[telescope_id].optics.tel_type
         picture_thresh, boundary_thresh = cleaning_level[camera.cam_id]
         mask = tailcuts_clean(camera, dl1.image[0], boundary_thresh=boundary_thresh, picture_thresh=picture_thresh)
-        if mask.sum() < 4:
+
+        if mask.sum() < 3:  # only two pixel remaining. No luck anyways.
             continue
 
         hillas_params = hillas_parameters(
@@ -172,6 +175,9 @@ def calculate_image_features(event, calibrator):
             dl1.image[0, mask],
             container=True
         )
+        if np.isnan(hillas_params.width.value) or np.isnan(hillas_params.length.value):
+            continue
+
 
         d = {
             'array_event_id': generate_unique_array_event_id(event),
@@ -203,6 +209,7 @@ def pair(a, b):
         if int(p).bit_length > 63:
             raise ValueError(f'"{a}" and "{b}" cannot be paired. Value exceeds 64 bits.')
         return p
+
 
 def generate_unique_array_event_id(event):
     return pair(event.r0.obs_id, event.r0.event_id)
