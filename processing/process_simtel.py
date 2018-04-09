@@ -164,7 +164,7 @@ def calculate_image_features(event, calibrator):
             continue
 
         telescope_type_name = event.inst.subarray.tels[telescope_id].optics.tel_type
-        picture_thresh, boundary_thresh = cleaning_level[camera.cam_id]
+        boundary_thresh, picture_thresh = cleaning_level[camera.cam_id]
         mask = tailcuts_clean(camera, dl1.image[0], boundary_thresh=boundary_thresh, picture_thresh=picture_thresh)
 
         if mask.sum() < 3:  # only two pixel remaining. No luck anyways.
