@@ -38,7 +38,7 @@ def get_links(type, password):
 
     print('Status code: {}'.format(r.status_code))
 
-    regex = r"href=\"({}_20deg_0deg.+?\.gz)".format(type)
+    regex = r"href=\"({}_20deg_0deg.+?NGFD.simtel.gz)".format(type)
     links = re.findall(regex, r.text)
     return links
 
