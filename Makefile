@@ -57,9 +57,9 @@ $(model_regressor) $(predictions): $(gamma_train) $(config_regressor)
 
 
 $(build_dir)/APPLICATION_DONE: $(proton_train) $(gamma_train) $(model_separator) $(config_separator) $(gamma_test) $(proton_test)
-	klaas_apply_separation_model $(config_separator) $(gamma_test) $(model_separator) --yes
-	klaas_apply_separation_model $(config_separator) $(proton_test) $(model_separator) --yes
-	klaas_apply_energy_regressor $(config_regressor) $(gamma_test) $(model_regressor) --yes
+	klaas_apply_separation_model $(config_separator) $(gamma_test) $(model_separator) --yes --chunksize 100000
+	klaas_apply_separation_model $(config_separator) $(proton_test) $(model_separator) --yes --chunksize 100000
+	klaas_apply_energy_regressor $(config_regressor) $(gamma_test) $(model_regressor) --yes --chunksize 100000
 	touch $(build_dir)/APPLICATION_DONE
 
 
