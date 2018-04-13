@@ -10,6 +10,7 @@ from astropy.utils.exceptions import AstropyDeprecationWarning
 from joblib import Parallel, delayed
 import numpy as np
 import multiprocessing
+from tqdm import tqdm
 
 
 # do some horrible things to silencece astropy warnings in ctapipe
@@ -39,8 +40,8 @@ def dummy_function_h_max(self, hillas_dict, subarray, tel_phi):
         exists=True,
         dir_okay=False,
     ))
-@click.option('-y', '--yes', help='Do not prompt for overwrites', is_flag=True)
-def main(input_file_path, output_file_path, instrument_description, yes):
+@click.option('-n', '--n_jobs', help='Number of threads to use', default=-1)
+def main(input_file_path, output_file_path, instrument_description, n_jobs):
 
     instrument = pickle.load(open(instrument_description, 'rb'))
 
@@ -56,8 +57,14 @@ def main(input_file_path, output_file_path, instrument_description, yes):
 
     events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id').dropna()
 
-    n_jobs = multiprocessing.cpu_count()
-    results = Parallel(n_jobs=n_jobs//2, verbose=5) (delayed(reconstruct_direction)(array_event_id, group, instrument=instrument) for array_event_id, group in events.groupby('array_event_id'))
+    if n_jobs == -1:
+        n_jobs = multiprocessing.cpu_count() // 2
+
+    if n_jobs > 1:
+        results = Parallel(n_jobs=n_jobs, verbose=5) (delayed(reconstruct_direction)(array_event_id, group, instrument=instrument) for array_event_id, group in events.groupby('array_event_id'))
+    else:
+        results = [reconstruct_direction(array_event_id, group, instrument=instrument) for array_event_id, group in tqdm(events.groupby('array_event_id'))]
+
     assert len(results) == len(array_events)
     df = pd.DataFrame(results)
     df.set_index('array_event_id', inplace=True)
