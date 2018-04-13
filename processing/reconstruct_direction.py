@@ -57,7 +57,7 @@ def main(input_file_path, output_file_path, instrument_description, yes):
     events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id').dropna()
 
     n_jobs = multiprocessing.cpu_count()
-    results = Parallel(n_jobs=n_jobs, verbose=5) (delayed(reconstruct_direction)(array_event_id, group, instrument=instrument) for array_event_id, group in events.groupby('array_event_id'))
+    results = Parallel(n_jobs=n_jobs//2, verbose=5) (delayed(reconstruct_direction)(array_event_id, group, instrument=instrument) for array_event_id, group in events.groupby('array_event_id'))
     assert len(results) == len(array_events)
     df = pd.DataFrame(results)
     df.set_index('array_event_id', inplace=True)
