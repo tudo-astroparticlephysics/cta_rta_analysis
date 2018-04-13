@@ -84,8 +84,8 @@ def main(gammas_dl3, protons_dl3, output):
     ax2.scatter(*wrap_angles(alt, az), label=f'gamma ({len(az)})', s=2, alpha=0.5)
     ax2.set_title('Reconstruncted Direction')
     #
-    ax1.set_ylim([-10, 10])
-    ax1.set_xlim([60, 80])
+    ax1.set_ylim([-25, 25])
+    ax1.set_xlim([45, 95])
     ax2.set_xlim(ax1.get_xlim())
     ax2.set_ylim(ax1.get_ylim())
     # az = protons.az_prediction.values * u.deg
