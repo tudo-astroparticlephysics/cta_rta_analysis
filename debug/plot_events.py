@@ -19,7 +19,7 @@ allowed_cameras = ['LSTCam', 'NectarCam', 'DigiCam']
 cleaning_level = {
                     'ASTRICam': (5, 7),  # (5, 10)?
                     'FlashCam': (12, 15),
-                    'LSTCam': (5, 10),  # ?? (3, 6) for Abelardo...
+                    'LSTCam': (3.5, 6),  # ?? (3, 6) for Abelardo...
                     # ASWG Zeuthen talk by Abelardo Moralejo:
                     'NectarCam': (4, 8),
                     # "FlashCam": (4, 8),  # there is some scaling missing?
@@ -41,8 +41,8 @@ def main(simtel_file, output_pdf, num_events):
     )
 
     calibrator = CameraCalibrator(
-        event_source=event_source,
-        r1_product='HESSIOR1Calibrator',
+        eventsource=event_source,
+        # r1_product='HESSIOR1Calibrator',
     )
     with PdfPages(output_pdf) as pdf:
         for event in tqdm(event_source, total=num_events):
@@ -72,7 +72,7 @@ def plot_event(event, pdf):
         p +=1
 
         boundary_thresh, picture_thresh = cleaning_level[camera.cam_id]
-        mask = tailcuts_clean(camera, dl1.image[0], boundary_thresh=boundary_thresh, picture_thresh=picture_thresh)
+        mask = tailcuts_clean(camera, dl1.image[0], boundary_thresh=boundary_thresh, picture_thresh=picture_thresh, min_number_picture_neighbors=1)
 
         if mask.sum() < 3:  # only two pixel remaining. No luck anyways.
             continue

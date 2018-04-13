@@ -51,33 +51,28 @@ def add_rectangles(ax, offset=0.1):
     ))
 def main(predicted_gammas, predicted_protons, output):
     gammas = fact.io.read_data(predicted_gammas, key='telescope_events').dropna()
-    mean_prediction_gammas = gammas.groupby('array_event_id')['gamma_prediction'].mean()
-    gamma_labels = np.ones_like(mean_prediction_gammas)
-
     protons = fact.io.read_data(predicted_protons, key='telescope_events').dropna()
-    mean_prediction_protons = protons.groupby('array_event_id')['gamma_prediction'].mean()
-    proton_labels = np.zeros_like(mean_prediction_protons)
 
-    y_score = np.hstack([mean_prediction_gammas, mean_prediction_protons])
-    y_true = np.hstack([gamma_labels, proton_labels])
+    for tel_type in ['SST', 'MST', 'LST']:
+        tel_gammas = gammas.query(f'telescope_type_name == "{tel_type}"')
+        tel_protons = protons.query(f'telescope_type_name == "{tel_type}"')
 
-    fpr, tpr, _ = roc_curve(y_true, y_score, pos_label=1)
-    auc = roc_auc_score(y_true, y_score)
+        mean_prediction_gammas = tel_gammas.groupby('array_event_id')['gamma_prediction'].mean()
+        gamma_labels = np.ones_like(mean_prediction_gammas)
 
-    plt.plot(fpr, tpr, lw=1)
+        mean_prediction_protons = tel_protons.groupby('array_event_id')['gamma_prediction'].mean()
+        proton_labels = np.zeros_like(mean_prediction_protons)
+
+        y_score = np.hstack([mean_prediction_gammas, mean_prediction_protons])
+        y_true = np.hstack([gamma_labels, proton_labels])
+
+        fpr, tpr, _ = roc_curve(y_true, y_score, pos_label=1)
+        auc = roc_auc_score(y_true, y_score)
+
+        plt.plot(fpr, tpr, lw=1, label=f'AUC for {tel_type}: {auc}')
 
     add_rectangles(plt.gca())
-
-    plt.text(
-        0.95,
-        0.1,
-        'Area Under Curve: ${:.4f}$'.format(auc),
-        verticalalignment='bottom',
-        horizontalalignment='right',
-        color='#404040',
-        fontsize=11
-    )
-
+    plt.legend()
 
     if output:
         plt.savefig(output)

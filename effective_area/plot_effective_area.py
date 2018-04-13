@@ -3,22 +3,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.stats import binom_conf_interval
 import fact.io
-from spectrum import MCSpectrum
+from spectrum import MCSpectrum, make_energy_bins
+import astropy.units as u
 
 
 @click.command()
-@click.argument('predicted_gammas', type=click.Path(exists=True))
+@click.argument('gammas_dl3', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(exists=False))
 @click.option('-b', '--bins', default=10, show_default=True)
-def main(predicted_gammas, output, bins):
-    gammas = fact.io.read_data(predicted_gammas, key='array_events')
+def main(gammas_dl3, output, bins):
+    gammas = fact.io.read_data(gammas_dl3, key='array_events')
     gammas_energy = gammas.mc_energy.values
 
-    runs = fact.io.read_data(predicted_gammas, key='runs')
+    runs = fact.io.read_data(gammas_dl3, key='runs')
     mc_production = MCSpectrum.from_cta_runs(runs)
+    bins, bin_center, bin_widths = make_energy_bins(gammas.mc_energy.values * u.TeV, bins=40)
 
-    hist_all, bin_edges = mc_production.expected_events_for_bins(bins=10)
-    hist_selected, _ = np.histogram(gammas_energy, bins=bin_edges)
+    hist_all = mc_production.expected_events_for_bins(energy_bins=bins)
+    hist_selected, _ = np.histogram(gammas_energy, bins=bins)
 
     invalid = hist_selected > hist_all
     hist_selected[invalid] = hist_all[invalid]
@@ -35,19 +37,16 @@ def main(predicted_gammas, output, bins):
     lower = area - lower_conf
     upper = upper_conf - area
 
-
-    bin_center = 0.5 * (bin_edges[:-1].value + bin_edges[1:].value)
-    bin_width = np.diff(bin_edges).value
-
     plt.errorbar(
-        bin_center,
+        bin_center.value,
         area.value,
-        xerr=bin_width / 2.0,
+        xerr=bin_widths.value / 2.0,
         yerr=[lower.value, upper.value],
         linestyle='',
     )
 
     plt.xscale('log')
+    plt.yscale('log')
     plt.xlabel(r'$E_{\mathrm{True}} /  \mathrm{TeV}$')
     plt.ylabel(r'$\mathrm{Mean Effective\; Area} / \mathrm{m}^2$')
 

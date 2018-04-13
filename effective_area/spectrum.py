@@ -4,7 +4,7 @@ from scipy.optimize import minimize_scalar
 from fact.analysis import li_ma_significance
 
 
-@u.quantity_input(e_min=u.TeV, e_max=u.TeV)
+@u.quantity_input(energies=u.TeV, e_min=u.TeV, e_max=u.TeV)
 def make_energy_bins(
         energies=None,
         e_min=None,
@@ -12,7 +12,7 @@ def make_energy_bins(
         bins=10,
         centering='linear',
 ):
-    if energies and len(energies) >= 2:
+    if energies is not None and len(energies) >= 2:
         e_min = min(energies)
         e_max = max(energies)
 
@@ -146,7 +146,7 @@ class Spectrum():
         else:
             return flux.to(1 / (u.TeV * u.s * u.cm**2))
 
-    @u.quantity_input(e_min=u.TeV, e_max=u.TeV, area=u.m**2, t_obs=u.s)
+    @u.quantity_input(e_min=u.TeV, e_max=u.TeV, area=u.m**2, t_obs=u.s, solid_angle=u.deg)
     def expected_events(self, e_min, e_max, area, t_obs, solid_angle=None):
         '''
         Get the number of events which are expected to arrive from this spectral source.
@@ -217,7 +217,6 @@ class Spectrum():
         solid_angle: Quantity (optional)
             the solid angle from which events are detected.
             Not needed for non-extended sources.
-
         '''
 
         edges = energy_bins
@@ -336,22 +335,35 @@ class MCSpectrum(Spectrum):
             self.normalization_constant = (total_showers_simulated / N) / (u.TeV * u.m**2 * u.s)
 
 
-    def expected_events_for_bins(self, bins,):
-        return super().expected_events_for_bins(
+    def expected_events_for_bins(self, energy_bins):
+        '''
+        Get the number of events which are expected to arrive from this spectral source.
+        For each of the requested bins.
+        Parameters
+        ----------
+        energy_bins: array like energy Quantity
+            The energy binning to use.
+        '''
+
+        edges = energy_bins
+        events = [self.expected_events(l, h) for (l, h) in zip(edges[0:], edges[1:])]
+        events = np.array(events)
+        return events
+
+
+    def expected_events(self, e_min=None, e_max=None):
+        if e_min is None:
+            e_min = self.e_min
+        if e_max is None:
+            e_max = self.e_max
+        return super().expected_events(
+            e_min=e_min,
+            e_max=e_max,
             area=self.generation_area,
             solid_angle=self.generator_solid_angle,
             t_obs=1 * u.s,
-            bins=bins,
         )
 
-    def expected_events(self, t_obs):
-        return super().expected_events(
-            e_min=self.e_min,
-            e_max=self.e_max,
-            area=self.generation_area,
-            solid_angle=self.generator_solid_angle,
-            t_obs=t_obs,
-        )
 
     @classmethod
     def from_cta_runs(cls, runs):
@@ -404,7 +416,7 @@ class MCSpectrum(Spectrum):
 
         event_energies = event_energies.to('TeV')
         N = self.total_showers_simulated
-        A = self.expected_events(t_assumed_obs) / N
+        A = self.expected_events() * t_assumed_obs.to('s').value / N
 
         w = A * other_spectrum.flux(event_energies) / self.flux(event_energies)
 
@@ -412,6 +424,21 @@ class MCSpectrum(Spectrum):
         # assert w.si.unit.is_unity() == True
         return w.value
 
+
+def trigger_efficency(simulated_energies, energy_bins):
+    from scipy import interpolate
+    p = [1.71e11, 0.0891, 1e5]
+
+    xx = energy_bins.to('MeV').value
+    efficency = p[0] * xx ** (-p[1]) * np.exp(-p[2] / xx)
+
+    efficency = efficency / efficency.max()
+    f = interpolate.interp1d(xx, efficency)
+    r = np.random.uniform(0, 1, simulated_energies.shape)
+
+    m = r > (1 - 0.5 * f(simulated_energies.to('MeV').value))
+    print(f'total trigger efficiency: {m.sum() / len(simulated_energies)}')
+    return m
 
 
 
@@ -423,7 +450,7 @@ if __name__ == '__main__':
     e_min = 0.003 * u.TeV
     e_max = 300 * u.TeV
     area = 1 * u.km**2
-    N = 5000000
+    N = 1000000
     simulation_index = -2.0
     t_assumed_obs = 50 * u.h
 
@@ -446,7 +473,9 @@ if __name__ == '__main__':
         energy_bins=energy_bins
     )
 
-    plt.errorbar(
+    fig, [ax1, ax2] = plt.subplots(2, 1)
+
+    ax1.errorbar(
         bin_center.value,
         events,
         xerr=bin_width.value * 0.5,
@@ -455,22 +484,59 @@ if __name__ == '__main__':
         label='expected events from crab',
         color='black',
     )
-    plt.hist(
+    h, _, _ = ax1.hist(
         random_energies,
         bins=energy_bins,
         histtype='step',
         label='randomply sampled events with index {}'.format(simulation_index),
         color='gray',
     )
-
     w = mc.reweigh_to_other_spectrum(crab, random_energies, t_assumed_obs=t_assumed_obs)
-    plt.hist(random_energies, bins=energy_bins, histtype='step',
-             weights=w, label='reweighted energies', color='red', lw=2)
+    h_w, _, _ = ax1.hist(
+        random_energies,
+        bins=energy_bins,
+        histtype='step',
+        weights=w,
+        label='reweighted energies',
+        color='red',
+        lw=2
+    )
+
+
+
+
+    trigger = trigger_efficency(random_energies, energy_bins)
+    h_trigger, _, _ = ax1.hist(
+        random_energies[trigger],
+        bins=energy_bins,
+        histtype='step',
+        label='events seen by telescope',
+        color='black',
+        alpha=0.8,
+    )
+    h_trigger_w, _, _ = ax1.hist(
+        random_energies[trigger],
+        bins=energy_bins,
+        weights=w[trigger],
+        histtype='step',
+        label='reiwghted events seen by telescope',
+        color='black',
+        lw=2,
+    )
 
     plt.title('Event Reweighing')
     plt.suptitle('Red line should be on black points')
-    plt.yscale('log')
-    plt.xscale('log')
-    plt.xlabel('Energy in TeV')
     plt.legend()
+    ax1.set_yscale('log')
+    ax1.set_xscale('log')
+    ax1.set_xlabel('Energy in TeV')
+
+
+    ax2.plot(bin_center, h / h_trigger)
+    ax2.plot(bin_center, h_w / h_trigger_w)
+    ax2.set_yscale('log')
+    ax2.set_xscale('log')
+    ax2.set_ylabel('ratios')
+    ax2.set_xlabel('Energy in TeV')
+
     plt.show()

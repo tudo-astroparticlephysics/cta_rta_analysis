@@ -5,6 +5,8 @@ data_dir = data
 plot_overview = $(build_dir)/separator_performance.pdf
 plot_overview_regressor = $(build_dir)/regressor_performance.pdf
 plot_roc = $(build_dir)/roc.pdf
+plot_roc_per_telescope = $(build_dir)/roc_per_telescope.pdf
+plot_auc_vs_energy = $(build_dir)/auc_vs_energy.pdf
 plot_hists = $(build_dir)/hists.pdf
 plot_angular_resolution = $(build_dir)/angular_resolution_1d.pdf
 plot_map = $(build_dir)/map.pdf
@@ -31,7 +33,7 @@ proton_dl3 = $(build_dir)/proton_dl3.hdf5
 
 # all: $(proton_test) $(proton_train) $(gamma_test) $(gamma_train) ../build/ANGULAR ../build/COLLECTION ../build/ML_PERF ../build/SENSITIVITY
 
-all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_map)
+all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_map) $(plot_roc_per_telescope) $(plot_auc_vs_energy)
 
 clean:
 	rm -rf $(build_dir)
@@ -70,8 +72,15 @@ $(plot_overview_regressor): $(model_regressor) $(predictions_regressor) matplotl
 
 
 # plot a roc curve
-$(plot_roc): $(proton_test) matplotlibrc ml/plot_multi_tel_auc.py $(build_dir)/APPLICATION_DONE
+$(plot_roc): $(proton_test) $(gamma_test) matplotlibrc ml/plot_multi_tel_auc.py $(build_dir)/APPLICATION_DONE
 	python ml/plot_multi_tel_auc.py $(gamma_test) $(proton_test) -o $(plot_roc)
+# plot a roc curve per telescope type
+$(plot_roc_per_telescope): $(proton_test) $(gamma_test) matplotlibrc ml/plot_auc_per_type.py $(build_dir)/APPLICATION_DONE
+	python ml/plot_auc_per_type.py $(gamma_test) $(proton_test) -o $(plot_roc_per_telescope)
+# plot a auc vs energy
+$(plot_auc_vs_energy): $(proton_test) $(gamma_test) matplotlibrc ml/plot_auc_vs_energy.py $(build_dir)/APPLICATION_DONE
+	python ml/plot_auc_vs_energy.py $(gamma_test) $(proton_test) -o $(plot_auc_vs_energy)
+
 
 # plot a prediction hists
 $(plot_hists):$(gamma_test) matplotlibrc ml/plot_prediction_hists.py $(build_dir)/APPLICATION_DONE

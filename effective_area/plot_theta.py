@@ -3,19 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import astropy.units as u
 import fact.io
-from astropy.coordinates import Angle
+import coordinates
 from spectrum import MCSpectrum, CrabSpectrum, CosmicRaySpectrum
-
-
-
-def calculate_distance(df):
-    alt = Angle(df.alt_prediction.values * u.rad).degree
-    mc_alt = Angle(df.mc_alt.values * u.rad).degree
-
-    az = Angle(df.az_prediction.values * u.rad).wrap_at(180 * u.deg).degree
-    mc_az = Angle(df.mc_az.values * u.rad).wrap_at(180 * u.deg).degree
-
-    return np.sqrt((alt - mc_alt)**2 + (az - mc_az)**2)
 
 
 @click.command()
@@ -24,38 +13,55 @@ def calculate_distance(df):
 @click.option('-o', '--output', type=click.Path(exists=False))
 def main(gammas_dl3, protons_dl3, output):
 
-    t_obs = 3.6 * u.h
+    t_obs = 0.5 * u.h
     cut = 0.0
 
     gammas = fact.io.read_data(gammas_dl3, key='array_events')
-    gammas = gammas.query(f'gamma_prediction_mean > {cut}')
+    gammas = gammas.dropna()
+
 
     gamma_runs = fact.io.read_data(gammas_dl3, key='runs')
     mc_production_gamma = MCSpectrum.from_cta_runs(gamma_runs)
 
     protons = fact.io.read_data(protons_dl3, key='array_events')
-    protons = protons.query(f'gamma_prediction_mean > {cut}')
+    protons = protons.dropna()
 
-    print(f'Plotting {len(protons)} protons and {len(gammas)} gammas.')
+    # print(f'Plotting {len(protons)} protons and {len(gammas)} gammas.')
     proton_runs = fact.io.read_data(protons_dl3, key='runs')
     mc_production_proton = MCSpectrum.from_cta_runs(proton_runs)
+
 
     crab = CrabSpectrum()
     cosmic = CosmicRaySpectrum()
 
-    gamma_weights = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
-    proton_weights = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
 
-    gammas['theta'] = calculate_distance(gammas)
-    protons['theta'] = calculate_distance(protons)
+    gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
+    protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
 
-    bins = np.linspace(0, 0.2, 40)
+    # min = gammas.mc_energy.min() * u.TeV
+    # max = gammas.mc_energy.max() * u.TeV
+    # n_crab = crab.expected_events(min, max, area=mc_production_gamma.generation_area, t_obs=t_obs)
+
+    # min = protons.mc_energy.min() * u.TeV
+    # max = protons.mc_energy.max() * u.TeV
+    # n_cosmic = cosmic.expected_events(min, max, area=mc_production_proton.generation_area, t_obs=t_obs, solid_angle=mc_production_proton.generator_solid_angle)
+
+
+    gammas_gammalike = gammas.query(f'gamma_prediction_mean > {cut}')
+    protons_gammalike = protons.query(f'gamma_prediction_mean > {cut}')
+
+
+    gammas_gammalike['theta'] = coordinates.calculate_distance_theta(gammas_gammalike)
+    protons_gammalike['theta'] = coordinates.calculate_distance_theta(protons_gammalike)
+
+    bins = np.linspace(0, 0.3, 20)
     kwargs = {'histtype': 'step', 'lw': 2.0}
 
 
-    plt.hist(gammas['theta']**2, bins=bins, label='gamma', **kwargs)
-    plt.hist(protons['theta']**2, bins=bins, label='proton', **kwargs)
-    plt.legend()
+    plt.hist(gammas_gammalike['theta']**2, bins=bins, label='gamma', weights=gammas_gammalike.weight, **kwargs)
+    h, _, _ = plt.hist(protons_gammalike['theta']**2, bins=bins, label='proton', weights=protons_gammalike.weight, **kwargs)
+    plt.suptitle(f'Observation Time {t_obs} \n Prediction threshold {cut}')
+    print(f'Mean Bkg per bin {h.mean()}, {h.std()}')
 
     if output:
         plt.savefig(output)
