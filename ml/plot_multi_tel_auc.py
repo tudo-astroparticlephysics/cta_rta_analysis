@@ -50,11 +50,11 @@ def add_rectangles(ax, offset=0.1):
         dir_okay=False,
     ))
 def main(predicted_gammas, predicted_protons, output):
-    gammas = fact.io.read_data(predicted_gammas, key='telescope_events').dropna()
+    gammas = fact.io.read_data(predicted_gammas, key='telescope_events', columns=['array_event_id', 'gamma_prediction']).dropna()
     mean_prediction_gammas = gammas.groupby('array_event_id')['gamma_prediction'].mean()
     gamma_labels = np.ones_like(mean_prediction_gammas)
 
-    protons = fact.io.read_data(predicted_protons, key='telescope_events').dropna()
+    protons = fact.io.read_data(predicted_protons, key='telescope_events', columns=['array_event_id', 'gamma_prediction']).dropna()
     mean_prediction_protons = protons.groupby('array_event_id')['gamma_prediction'].mean()
     proton_labels = np.zeros_like(mean_prediction_protons)
 

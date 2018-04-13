@@ -50,8 +50,10 @@ def add_rectangles(ax, offset=0.1):
         dir_okay=False,
     ))
 def main(predicted_gammas, predicted_protons, output):
-    gammas = fact.io.read_data(predicted_gammas, key='telescope_events').dropna()
-    protons = fact.io.read_data(predicted_protons, key='telescope_events').dropna()
+    cols=['gamma_prediction', 'array_event_id', 'telescope_type_name']
+
+    gammas = fact.io.read_data(predicted_gammas, key='telescope_events', columns=cols).dropna()
+    protons = fact.io.read_data(predicted_protons, key='telescope_events',  columns=cols).dropna()
 
     for tel_type in ['SST', 'MST', 'LST']:
         tel_gammas = gammas.query(f'telescope_type_name == "{tel_type}"')
