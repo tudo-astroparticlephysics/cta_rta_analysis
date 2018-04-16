@@ -8,9 +8,16 @@ plot_roc = $(build_dir)/roc.pdf
 plot_roc_per_telescope = $(build_dir)/roc_per_telescope.pdf
 plot_auc_vs_energy = $(build_dir)/auc_vs_energy.pdf
 plot_hists = $(build_dir)/hists.pdf
+
 plot_angular_resolution = $(build_dir)/angular_resolution_1d.pdf
 plot_map = $(build_dir)/map.png
 plot_ang_res_energy = $(build_dir)/angular_resolution_energy.png
+
+plot_sensitivity_all = $(build_dir)/sensitivity.pdf
+plot_sensitivity_sst = $(build_dir)/sensitivity_sst.pdf
+plot_sensitivity_mst = $(build_dir)/sensitivity_mst.pdf
+plot_sensitivity_lst = $(build_dir)/sensitivity_lst.pdf
+
 
 gamma_output = $(data_dir)/dl2/gammas.hdf5
 proton_output = $(data_dir)/dl2/protons.hdf5
@@ -43,7 +50,7 @@ proton_dl3_lst = $(build_dir)/proton_dl3_lst.hdf5
 
 # all: $(proton_test) $(proton_train) $(gamma_test) $(gamma_train) ../build/ANGULAR ../build/COLLECTION ../build/ML_PERF ../build/SENSITIVITY
 
-all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_ang_res_energy) $(plot_map) $(plot_roc_per_telescope) $(plot_auc_vs_energy)
+all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_ang_res_energy) $(plot_map) $(plot_roc_per_telescope) $(plot_auc_vs_energy) $(plot_sensitivity_all) $(plot_sensitivity_sst) $(plot_sensitivity_mst) $(plot_sensitivity_lst) 
 
 clean:
 	rm -rf $(build_dir)
@@ -53,10 +60,10 @@ $(build_dir):
 
 
 $(proton_test) $(proton_train): $(proton_output) | $(build_dir)
-	klaas_split_data $(proton_output) $(build_dir)/protons -n test -f 0.98 -n train -f 0.02  -t cta
+	klaas_split_data $(proton_output) $(build_dir)/protons -n test -f 0.5 -n train -f 0.5  -t cta
 
 $(gamma_test) $(gamma_train): $(gamma_output) | $(build_dir)
-	klaas_split_data $(gamma_output) $(build_dir)/gammas -n test -f 0.98 -n train -f 0.02  -t cta
+	klaas_split_data $(gamma_output) $(build_dir)/gammas -n test -f 0.5 -n train -f 0.5  -t cta
 
 $(model_separator) $(predictions): $(proton_train) $(gamma_train) $(config_separator)
 	klaas_train_separation_model $(config_separator) $(gamma_train) $(proton_train) $(predictions_separator) $(model_separator)
@@ -127,3 +134,15 @@ $(plot_angular_resolution): $(gamma_dl3)
 
 $(plot_map): $(gamma_dl3) $(proton_dl3)
 	python effective_area/plot_map.py $(gamma_dl3) $(proton_dl3) -o $(plot_map)
+
+$(plot_sensitivity_all): $(gamma_dl3) $(proton_dl3)
+	python effective_area/plot_sensitivity.py  $(gamma_dl3) $(proton_dl3) -n 40 -j 20 -o $(plot_sensitivity_all)
+
+$(plot_sensitivity_sst): $(gamma_dl3_sst) $(proton_dl3_sst)
+	python effective_area/plot_sensitivity.py  $(gamma_dl3_sst) $(proton_dl3_sst) -n 40 -j 20 -o $(plot_sensitivity_sst)
+
+$(plot_sensitivity_mst): $(gamma_dl3_mst) $(proton_dl3_mst)
+	python effective_area/plot_sensitivity.py  $(gamma_dl3_mst) $(proton_dl3_mst) -n 40 -j 20 -o $(plot_sensitivity_mst)
+
+$(plot_sensitivity_lst): $(gamma_dl3_lst) $(proton_dl3_lst)
+	python effective_area/plot_sensitivity.py  $(gamma_dl3_lst) $(proton_dl3_lst) -n 40 -j 20 -o $(plot_sensitivity_lst)
