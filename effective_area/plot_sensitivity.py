@@ -86,6 +86,9 @@ def calculate_sensitivity(
     selected_gammas = gammas.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
     selected_protons = protons.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
 
+    if len(selected_gammas) < 10 or len(selected_protons) < 10:
+        return np.inf/(u.erg * u.s * u.cm**2)
+
     n_on, n_off = get_on_and_off_counts(
         selected_protons,
         selected_gammas,
@@ -120,12 +123,14 @@ def get_on_and_off_counts(selected_protons, selected_gammas, signal_region_radiu
     # if selected_protons.weight.count() == 30:
     #     print(selected_protons.weight)
     b = np.nanpercentile(selected_protons.theta**2, 68)
+
     if b == np.nan:
         b = 10
 
+
     H, _ = np.histogram(
         selected_protons.theta**2,
-        bins=np.arange(0, 10, background_region_radius),
+        bins=np.arange(0, b, background_region_radius),
         weights=selected_protons.weight
     )
     n_off = H.mean()
@@ -179,7 +184,7 @@ def find_best_sensitivity_in_bin(g, p):
     def f(x):
         return calculate_sensitivity(g, p, gamma_prediction_mean=x[0], signal_region=x[1]).value
 
-    ranges = (slice(0.5, 1, 0.05), slice(0.001, 0.04, 0.002))
+    ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.08, 0.001))
     # Note: while it seems obviuous to use finish=optimize.fmin here. apparently it
     # tests invalid values. and then everything breaks. Negative theta cuts for
     # example
@@ -211,14 +216,16 @@ def main(
     e_min, e_max = 0.003 * u.TeV, 300 * u.TeV
     bin_edges, _, _ = make_energy_bins(e_min=e_min, e_max=e_max, bins=n_bins)
 
-    gammas = fact.io.read_data(gammas_dl3, key='array_events')
+
+    columns = ['gamma_prediction_mean', 'az_prediction', 'alt_prediction', 'mc_alt', 'mc_az', 'mc_energy']
+    gammas = fact.io.read_data(gammas_dl3, key='array_events', columns=columns)
     gammas = gammas.dropna()
 
 
     gamma_runs = fact.io.read_data(gammas_dl3, key='runs')
     mc_production_gamma = MCSpectrum.from_cta_runs(gamma_runs)
 
-    protons = fact.io.read_data(protons_dl3, key='array_events')
+    protons = fact.io.read_data(protons_dl3, key='array_events', columns=columns)
     protons = protons.dropna()
 
     # print(f'Plotting {len(protons)} protons and {len(gammas)} gammas.')

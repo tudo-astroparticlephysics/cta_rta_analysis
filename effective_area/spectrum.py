@@ -68,7 +68,7 @@ def relative_sensitivity(
 
     scale = []
     for on, off in zip(n_on, n_off):
-        if on < off * alpha or off == 0:
+        if on < off * alpha or off <= 10:
             scale.append(np.inf)
             continue
 
@@ -76,7 +76,7 @@ def relative_sensitivity(
             s = li_ma_significance((on - off) * relative_flux + off, off, alpha=alpha)
             return (target_significance - s)**2
 
-        s = minimize_scalar(f, bounds=(1e-12, 100), method='bounded')
+        s = minimize_scalar(f, bounds=(1e-13, 300), method='bounded')
 
         scale.append(s.x)
 
