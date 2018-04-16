@@ -98,24 +98,24 @@ $(plot_hists):$(gamma_test) matplotlibrc ml/plot_prediction_hists.py $(build_dir
 
 
 # reconstruct direction
-$(gamma_dl3) : matplotlibrc processing/reconstruct_direction.py
+$(gamma_dl3) : matplotlibrc processing/reconstruct_direction.py $(gamma_test)
 	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3) ./processing/instrument_description.pkl
-$(proton_dl3) : matplotlibrc processing/reconstruct_direction.py
+$(proton_dl3) : matplotlibrc processing/reconstruct_direction.py $(proton_test)
 	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3) ./processing/instrument_description.pkl
 
-$(gamma_dl3_sst) : matplotlibrc processing/reconstruct_direction.py
+$(gamma_dl3_sst) : matplotlibrc processing/reconstruct_direction.py $(gamma_test)
 	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3_sst) ./processing/instrument_description.pkl -t SST
-$(proton_dl3_sst) : matplotlibrc processing/reconstruct_direction.py
+$(proton_dl3_sst) : matplotlibrc processing/reconstruct_direction.py $(proton_test)
 	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3_sst) ./processing/instrument_description.pkl -t SST
 
-$(gamma_dl3_mst) : matplotlibrc processing/reconstruct_direction.py
+$(gamma_dl3_mst) : matplotlibrc processing/reconstruct_direction.py $(gamma_test)
 	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3_mst) ./processing/instrument_description.pkl -t MST
-$(proton_dl3_mst) : matplotlibrc processing/reconstruct_direction.py
+$(proton_dl3_mst) : matplotlibrc processing/reconstruct_direction.py $(proton_test)
 	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3_mst) ./processing/instrument_description.pkl -t MST
 
-$(gamma_dl3_lst) : matplotlibrc processing/reconstruct_direction.py
+$(gamma_dl3_lst) : matplotlibrc processing/reconstruct_direction.py $(gamma_test)
 	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3_lst) ./processing/instrument_description.pkl -t LST
-$(proton_dl3_lst) : matplotlibrc processing/reconstruct_direction.py
+$(proton_dl3_lst) : matplotlibrc processing/reconstruct_direction.py $(proton_test)
 	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3_lst) ./processing/instrument_description.pkl -t LST
 
 
