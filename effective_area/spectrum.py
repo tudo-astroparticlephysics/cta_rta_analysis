@@ -1,7 +1,5 @@
 import numpy as np
 import astropy.units as u
-from scipy.optimize import minimize_scalar
-from fact.analysis import li_ma_significance
 
 
 @u.quantity_input(energies=u.TeV, e_min=u.TeV, e_max=u.TeV)
@@ -31,58 +29,6 @@ def make_energy_bins(
 
     return bin_edges, bin_centers, bin_widths
 
-
-@u.quantity_input(t_obs=u.hour, t_ref=u.hour)
-def relative_sensitivity(
-        n_on,
-        n_off,
-        alpha,
-        target_significance=5,
-):
-    '''
-    Calculate the relative sensitivity defined as the flux
-    relative to the reference source that is detectable with
-    significance in t_ref.
-
-    Parameters
-    ----------
-    n_on: int or array-like
-        Number of signal-like events for the on observations
-    n_off: int or array-like
-        Number of signal-like events for the off observations
-    alpha: float
-        Scaling factor between on and off observations.
-        1 / number of off regions for wobble observations.
-    target_significance: float
-        Significance necessary for a detection
-
-    Returns
-    ----------
-    The relative flux neccessary to detect the source with the given target significance.
-    '''
-    is_scalar = np.isscalar(n_on) and np.isscalar(n_off)
-
-    if is_scalar:
-        n_on = [n_on]
-        n_off = [n_off]
-
-    scale = []
-    for on, off in zip(n_on, n_off):
-        if on < off * alpha or off <= 10:
-            scale.append(np.inf)
-            continue
-
-        def f(relative_flux):
-            s = li_ma_significance((on - off) * relative_flux + off, off, alpha=alpha)
-            return (target_significance - s)**2
-
-        s = minimize_scalar(f, bounds=(1e-13, 300), method='bounded')
-
-        scale.append(s.x)
-
-    if is_scalar:
-        return scale[0]
-    return scale
 
 
 class Spectrum():
