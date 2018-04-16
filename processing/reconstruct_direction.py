@@ -41,21 +41,25 @@ def dummy_function_h_max(self, hillas_dict, subarray, tel_phi):
         dir_okay=False,
     ))
 @click.option('-n', '--n_jobs', help='Number of threads to use', default=-1)
-def main(input_file_path, output_file_path, instrument_description, n_jobs):
+@click.option('-t', '--tel_type', help='Telescope Types to use', type=click.Choice(['all', 'MST', 'SST', 'LST']), default='all')
+def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_type):
 
     instrument = pickle.load(open(instrument_description, 'rb'))
 
     runs = fact.io.read_data(input_file_path, key='runs')
     runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
 
-    telescope_events = fact.io.read_data(input_file_path, key='telescope_events')
+    telescope_events = fact.io.read_data(input_file_path, key='telescope_events',)
     telescope_events.set_index('telescope_event_id', drop=True, verify_integrity=True, inplace=True)
 
-    array_events = fact.io.read_data(input_file_path, key='array_events')
+    if tel_type != 'all':
+        telescope_events = telescope_events.query(f'telescope_type_name == "{tel_type}"')
+
+    array_events = fact.io.read_data(input_file_path, key='array_events',)
     array_events.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
 
 
-    events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id').dropna()
+    events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id').dropna()[:250]
 
     if n_jobs == -1:
         n_jobs = multiprocessing.cpu_count() // 2
@@ -65,7 +69,9 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs):
     else:
         results = [reconstruct_direction(array_event_id, group, instrument=instrument) for array_event_id, group in tqdm(events.groupby('array_event_id'))]
 
-    assert len(results) == len(array_events)
+    if tel_type == 'all':
+        assert len(results) == len(array_events)
+
     df = pd.DataFrame(results)
     df.set_index('array_event_id', inplace=True)
 
@@ -73,6 +79,8 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs):
     array_events['az_prediction'] = df.az_prediction
     array_events['core_x_prediction'] = df.core_x_prediction
     array_events['core_y_prediction'] = df.core_y_prediction
+
+
     if 'gamma_prediction' in telescope_events.columns:
         array_events['gamma_prediction_mean'] = telescope_events.groupby('array_event_id')['gamma_prediction'].mean()
         array_events['gamma_prediction_std'] = telescope_events.groupby('array_event_id')['gamma_prediction'].std()
@@ -125,23 +133,13 @@ def reconstruct_direction(array_event_id, group, instrument):
             # 'h_max_prediction': reconstruction.h_max.si.value
             }
 
-
-def strip_unit(v):
-    try:
-        return v.si.value
-    except AttributeError:
-        return v
-
-
-def moments_from_row(row):
-    return SubMomentParameters(
-        size=row.intensity,
-        cen_x=row.x * u.m,
-        cen_y=row.y * u.m,
-        length=row.length * u.m,
-        width=row.width * u.m,
-        psi=row.psi * u.rad
-    )
+#
+# def strip_unit(v):
+#     try:
+#         return v.si.value
+#     except AttributeError:
+#         return v
+#
 
 
 if __name__ == '__main__':

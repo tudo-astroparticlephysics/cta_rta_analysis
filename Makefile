@@ -32,6 +32,15 @@ config_regressor = configs/regressor.yaml
 gamma_dl3 = $(build_dir)/gamma_dl3.hdf5
 proton_dl3 = $(build_dir)/proton_dl3.hdf5
 
+gamma_dl3_sst = $(build_dir)/gamma_dl3_sst.hdf5
+proton_dl3_sst = $(build_dir)/proton_dl3_sst.hdf5
+
+gamma_dl3_mst = $(build_dir)/gamma_dl3_mst.hdf5
+proton_dl3_mst = $(build_dir)/proton_dl3_mst.hdf5
+
+gamma_dl3_lst = $(build_dir)/gamma_dl3_lst.hdf5
+proton_dl3_lst = $(build_dir)/proton_dl3_lst.hdf5
+
 # all: $(proton_test) $(proton_train) $(gamma_test) $(gamma_train) ../build/ANGULAR ../build/COLLECTION ../build/ML_PERF ../build/SENSITIVITY
 
 all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_ang_res_energy) $(plot_map) $(plot_roc_per_telescope) $(plot_auc_vs_energy)
@@ -91,9 +100,24 @@ $(plot_hists):$(gamma_test) matplotlibrc ml/plot_prediction_hists.py $(build_dir
 # reconstruct direction
 $(gamma_dl3) : matplotlibrc processing/reconstruct_direction.py
 	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3) ./processing/instrument_description.pkl
-
 $(proton_dl3) : matplotlibrc processing/reconstruct_direction.py
 	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3) ./processing/instrument_description.pkl
+
+$(gamma_dl3_sst) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3_sst) ./processing/instrument_description.pkl -t SST
+$(proton_dl3_sst) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3_sst) ./processing/instrument_description.pkl -t SST
+
+$(gamma_dl3_mst) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3_mst) ./processing/instrument_description.pkl -t MST
+$(proton_dl3_mst) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3_mst) ./processing/instrument_description.pkl -t MST
+
+$(gamma_dl3_lst) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(gamma_test) $(gamma_dl3_lst) ./processing/instrument_description.pkl -t LST
+$(proton_dl3_lst) : matplotlibrc processing/reconstruct_direction.py
+	python processing/reconstruct_direction.py $(proton_test) $(proton_dl3_lst) ./processing/instrument_description.pkl -t LST
+
 
 $(plot_ang_res_energy): $(gamma_dl3)
 	python angular_resolution/plot_angular_resolution_vs_energy.py $(gamma_dl3) -o $(plot_ang_res_energy)
