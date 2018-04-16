@@ -59,7 +59,7 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_
     array_events.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
 
 
-    events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id').dropna()[:250]
+    events = pd.merge(left=array_events, right=telescope_events, left_index=True, right_on='array_event_id').dropna()
 
     if n_jobs == -1:
         n_jobs = multiprocessing.cpu_count() // 2
