@@ -14,7 +14,7 @@ def plot_sensitivity(bin_edges, sensitivity, t_obs, ax=None, scale=True, **kwarg
     error = None
 
     if not ax:
-        _, ax = plt.subplots(1)
+        ax = plt.gca()
 
     bin_center = 0.5 * (bin_edges[:-1] + bin_edges[1:])
     bin_width = np.diff(bin_edges)
@@ -75,14 +75,14 @@ def plot_spectrum(spectrum, e_min, e_max, ax=None, scale=True, **kwargs):
 
 
 @click.command()
-@click.argument('gammas_dl3', type=click.Path(exists=True, dir_okay=False,))
-@click.argument('protons_dl3', type=click.Path(exists=True, dir_okay=False,))
+@click.option('-g', '--gamma_input', type=click.Path(exists=True), multiple=True)
+@click.option('-p', '--proton_input', type=click.Path(exists=True), multiple=True)
+@click.option('-l', '--label', multiple=True)
 @click.option('-n', '--n_bins', type=click.INT, default=10, help='energy bins to plot')
 @click.option('-j', '--n_jobs', type=click.INT, default=-1, help='number of threads to use inparallel')
 @click.option('-o', '--output', type=click.Path(exists=False))
 def main(
-    gammas_dl3,
-    protons_dl3,
+    gamma_input, proton_input, label,
     n_bins,
     n_jobs,
     output,
@@ -91,44 +91,59 @@ def main(
     Plots a sensitivity curve vs real energy. For each energy bin it performs a gridsearch
     to find the theta and gamma_prediction_mean cuts that produce the highest sensitivity.
     '''
+
+    if len(gamma_input) != len(proton_input):
+        print('Must pass as many gamma files as proton files')
+
+    if label and len(proton_input) != len(label):
+        print('Must pass as many labels as gamma files as proton files')
+
     t_obs = 50 * u.h
     e_min, e_max = 0.003 * u.TeV, 300 * u.TeV
     bin_edges, _, _ = make_energy_bins(e_min=e_min, e_max=e_max, bins=n_bins)
 
-
     columns = ['gamma_prediction_mean', 'az_prediction', 'alt_prediction', 'mc_alt', 'mc_az', 'mc_energy']
-    gammas = fact.io.read_data(gammas_dl3, key='array_events', columns=columns)
-    gammas = gammas.dropna()
+
+    if not label:
+        label = [None] * len(proton_input)
+
+    for gammas_dl3, protons_dl3, l in zip(gamma_input, proton_input, label):
+        print(f'Calculating sensitivity for label {l}')
+        gammas = fact.io.read_data(gammas_dl3, key='array_events', columns=columns)
+        gammas = gammas.dropna()
 
 
-    gamma_runs = fact.io.read_data(gammas_dl3, key='runs')
-    mc_production_gamma = MCSpectrum.from_cta_runs(gamma_runs)
+        gamma_runs = fact.io.read_data(gammas_dl3, key='runs')
+        mc_production_gamma = MCSpectrum.from_cta_runs(gamma_runs)
 
-    protons = fact.io.read_data(protons_dl3, key='array_events', columns=columns)
-    protons = protons.dropna()
+        protons = fact.io.read_data(protons_dl3, key='array_events', columns=columns)
+        protons = protons.dropna()
 
-    # print(f'Plotting {len(protons)} protons and {len(gammas)} gammas.')
-    proton_runs = fact.io.read_data(protons_dl3, key='runs')
-    mc_production_proton = MCSpectrum.from_cta_runs(proton_runs)
-
-
-    crab = CrabSpectrum()
-    cosmic = CosmicRaySpectrum()
+        proton_runs = fact.io.read_data(protons_dl3, key='runs')
+        mc_production_proton = MCSpectrum.from_cta_runs(proton_runs)
 
 
-    gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
-    protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
+        crab = CrabSpectrum()
+        cosmic = CosmicRaySpectrum()
 
-    protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
-    gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
 
-    gammas['theta'] = calculate_distance_theta(gammas)
-    protons['theta'] = calculate_distance_theta(protons)
+        gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
+        protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
 
-    sens, edges = find_differential_sensitivity(protons, gammas, n_bins, num_threads=n_jobs)
-    sens = sens.to(1 / (u.erg * u.s * u.cm**2))
-    ax = plot_sensitivity(edges, sens, t_obs, ax=None)
+        protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
+        gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
+
+        gammas['theta'] = calculate_distance_theta(gammas)
+        protons['theta'] = calculate_distance_theta(protons)
+
+        sens = find_differential_sensitivity(protons, gammas, bin_edges=bin_edges, num_threads=n_jobs)
+        sens = sens.to(1 / (u.erg * u.s * u.cm**2))
+        ax = plot_sensitivity(bin_edges, sens, t_obs, ax=None, label=l)
+
     plot_spectrum(crab, e_min, e_max, ax=ax, color='gray')
+
+    if label[0]:
+        plt.legend()
 
     if output:
         plt.savefig(output)

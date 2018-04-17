@@ -132,24 +132,16 @@ def get_on_and_off_counts(selected_protons, selected_gammas, signal_region_radiu
 def find_differential_sensitivity(
             protons,
             gammas,
-            n_bins,
+            bin_edges,
             target_spectrum=CrabSpectrum(),
             num_threads=-1
         ):
 
-    min_energy = min(gammas.mc_energy.min(),
-                     protons.mc_energy.min())
-    max_energy = max(gammas.mc_energy.max(),
-                     protons.mc_energy.max())
-
-    edges = np.logspace(np.log10(min_energy), np.log10(
-        max_energy), num=n_bins + 1, base=10.0) * u.TeV
-
-    gammas['energy_bin'] = pd.cut(gammas.mc_energy, edges)
-    protons['energy_bin'] = pd.cut(protons.mc_energy, edges)
+    gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
+    protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
 
     if num_threads == -1:
-        num_threads = multiprocessing.cpu_count()
+        num_threads = multiprocessing.cpu_count() // 2
 
     if num_threads > 1:
         d = (
@@ -165,7 +157,7 @@ def find_differential_sensitivity(
 
     # multiply the whole thing by the proper unit. There must be a nicer way to do this.
     sensitivity = np.array([s.value for s in sensitivity]) * sensitivity[0].unit
-    return sensitivity, edges
+    return sensitivity
 
 
 def find_best_sensitivity_in_bin(g, p):
@@ -173,7 +165,8 @@ def find_best_sensitivity_in_bin(g, p):
     def f(x):
         return calculate_sensitivity(g, p, gamma_prediction_mean=x[0], signal_region=x[1]).value
 
-    ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.08, 0.001))
+    # ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.08, 0.001))
+    ranges = (slice(0.0, 1, 0.05), slice(0.001, 0.1, 0.0025))
     # Note: while it seems obviuous to use finish=optimize.fmin here. apparently it
     # tests invalid values. and then everything breaks. Negative theta cuts for
     # example

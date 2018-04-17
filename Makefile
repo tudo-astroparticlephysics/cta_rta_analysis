@@ -17,6 +17,7 @@ plot_sensitivity_all = $(build_dir)/sensitivity.pdf
 plot_sensitivity_sst = $(build_dir)/sensitivity_sst.pdf
 plot_sensitivity_mst = $(build_dir)/sensitivity_mst.pdf
 plot_sensitivity_lst = $(build_dir)/sensitivity_lst.pdf
+plot_sensitivity_combined = $(build_dir)/sensitivity_combined.pdf
 
 
 gamma_output = $(data_dir)/dl2/gammas.hdf5
@@ -48,9 +49,7 @@ proton_dl3_mst = $(build_dir)/proton_dl3_mst.hdf5
 gamma_dl3_lst = $(build_dir)/gamma_dl3_lst.hdf5
 proton_dl3_lst = $(build_dir)/proton_dl3_lst.hdf5
 
-# all: $(proton_test) $(proton_train) $(gamma_test) $(gamma_train) ../build/ANGULAR ../build/COLLECTION ../build/ML_PERF ../build/SENSITIVITY
-
-all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_ang_res_energy) $(plot_map) $(plot_roc_per_telescope) $(plot_auc_vs_energy) $(plot_sensitivity_all) $(plot_sensitivity_sst) $(plot_sensitivity_mst) $(plot_sensitivity_lst) 
+all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_angular_resolution) $(plot_ang_res_energy) $(plot_map) $(plot_roc_per_telescope) $(plot_auc_vs_energy) $(plot_sensitivity_all) $(plot_sensitivity_sst) $(plot_sensitivity_mst) $(plot_sensitivity_lst) $(plot_sensitivity_combined)
 
 clean:
 	rm -rf $(build_dir)
@@ -72,7 +71,7 @@ $(model_regressor) $(predictions): $(gamma_train) $(config_regressor)
 	klaas_train_energy_regressor $(config_regressor) $(gamma_train) $(predictions_regressor) $(model_regressor)
 
 
-$(build_dir)/APPLICATION_DONE: $(proton_train) $(gamma_train) $(model_separator) $(config_separator) $(gamma_test) $(proton_test)
+$(build_dir)/APPLICATION_DONE: $(proton_train) $(gamma_train) $(model_separator) $(config_separator) $(gamma_test) $(proton_test) $(model_regressor)
 	klaas_apply_separation_model $(config_separator) $(gamma_test) $(model_separator) --yes --chunksize 100000
 	klaas_apply_separation_model $(config_separator) $(proton_test) $(model_separator) --yes --chunksize 100000
 	klaas_apply_energy_regressor $(config_regressor) $(gamma_test) $(model_regressor) --yes --chunksize 100000
@@ -136,13 +135,16 @@ $(plot_map): $(gamma_dl3) $(proton_dl3)
 	python effective_area/plot_map.py $(gamma_dl3) $(proton_dl3) -o $(plot_map)
 
 $(plot_sensitivity_all): $(gamma_dl3) $(proton_dl3)
-	python effective_area/plot_sensitivity.py  $(gamma_dl3) $(proton_dl3) -n 40 -j 20 -o $(plot_sensitivity_all)
+	python effective_area/plot_sensitivity.py  -g $(gamma_dl3) -p $(proton_dl3) -n 20 -o $(plot_sensitivity_all)
 
 $(plot_sensitivity_sst): $(gamma_dl3_sst) $(proton_dl3_sst)
-	python effective_area/plot_sensitivity.py  $(gamma_dl3_sst) $(proton_dl3_sst) -n 40 -j 20 -o $(plot_sensitivity_sst)
+	python effective_area/plot_sensitivity.py  -g $(gamma_dl3_sst) -p $(proton_dl3_sst) -n 20 -o $(plot_sensitivity_sst)
 
 $(plot_sensitivity_mst): $(gamma_dl3_mst) $(proton_dl3_mst)
-	python effective_area/plot_sensitivity.py  $(gamma_dl3_mst) $(proton_dl3_mst) -n 40 -j 20 -o $(plot_sensitivity_mst)
+	python effective_area/plot_sensitivity.py  -g $(gamma_dl3_mst) -p $(proton_dl3_mst) -n 20 -o $(plot_sensitivity_mst)
 
 $(plot_sensitivity_lst): $(gamma_dl3_lst) $(proton_dl3_lst)
-	python effective_area/plot_sensitivity.py  $(gamma_dl3_lst) $(proton_dl3_lst) -n 40 -j 20 -o $(plot_sensitivity_lst)
+	python effective_area/plot_sensitivity.py  -g $(gamma_dl3_lst) -p $(proton_dl3_lst) -n 20 -o $(plot_sensitivity_lst)
+
+$(plot_sensitivity_combined): $(gamma_dl3_lst) $(proton_dl3_lst) $(gamma_dl3_mst) $(proton_dl3_mst) $(gamma_dl3_sst) $(proton_dl3_sst)
+	python effective_area/plot_sensitivity.py  -g $(gamma_dl3_sst) -g $(gamma_dl3_mst) -g $(gamma_dl3_lst) -p $(proton_dl3_sst)  -p $(proton_dl3_mst) -p $(proton_dl3_lst) -l 'SST' -l 'MST' -l 'LST' -n 20 -o $(plot_sensitivity_combined)
