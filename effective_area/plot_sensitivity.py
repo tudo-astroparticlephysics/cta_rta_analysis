@@ -78,11 +78,12 @@ def plot_spectrum(spectrum, e_min, e_max, ax=None, scale=True, **kwargs):
 @click.option('-g', '--gamma_input', type=click.Path(exists=True), multiple=True)
 @click.option('-p', '--proton_input', type=click.Path(exists=True), multiple=True)
 @click.option('-l', '--label', multiple=True)
+@click.option('-c', '--color', multiple=True)
 @click.option('-n', '--n_bins', type=click.INT, default=10, help='energy bins to plot')
 @click.option('-j', '--n_jobs', type=click.INT, default=-1, help='number of threads to use inparallel')
 @click.option('-o', '--output', type=click.Path(exists=False))
 def main(
-    gamma_input, proton_input, label,
+    gamma_input, proton_input, label, color,
     n_bins,
     n_jobs,
     output,
@@ -98,6 +99,9 @@ def main(
     if label and len(proton_input) != len(label):
         print('Must pass as many labels as gamma files as proton files')
 
+    if color and len(label) != len(color):
+        print('Must pass as many colors as labels')
+
     t_obs = 50 * u.h
     e_min, e_max = 0.003 * u.TeV, 300 * u.TeV
     bin_edges, _, _ = make_energy_bins(e_min=e_min, e_max=e_max, bins=n_bins)
@@ -107,7 +111,10 @@ def main(
     if not label:
         label = [None] * len(proton_input)
 
-    for gammas_dl3, protons_dl3, l in zip(gamma_input, proton_input, label):
+    if not color:
+        color = [None] * len(proton_input)
+
+    for gammas_dl3, protons_dl3, l, c in zip(gamma_input, proton_input, label, color):
         print(f'Calculating sensitivity for label {l}')
         gammas = fact.io.read_data(gammas_dl3, key='array_events', columns=columns)
         gammas = gammas.dropna()
@@ -138,7 +145,7 @@ def main(
 
         sens = find_differential_sensitivity(protons, gammas, bin_edges=bin_edges, num_threads=n_jobs)
         sens = sens.to(1 / (u.erg * u.s * u.cm**2))
-        ax = plot_sensitivity(bin_edges, sens, t_obs, ax=None, label=l)
+        ax = plot_sensitivity(bin_edges, sens, t_obs, ax=None, label=l, color=c)
 
     plot_spectrum(crab, e_min, e_max, ax=ax, color='gray')
 
