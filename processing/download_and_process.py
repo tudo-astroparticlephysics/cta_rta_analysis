@@ -6,7 +6,6 @@ import os
 import re
 from process_simtel import process_file, verify_file
 from tqdm import tqdm
-import os
 
 
 BASEURL = 'https://www.mpi-hd.mpg.de/personalhomes/bernlohr/cta-raw/Prod-3/Paranal-3HB89/'

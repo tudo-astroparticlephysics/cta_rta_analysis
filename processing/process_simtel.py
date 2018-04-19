@@ -1,13 +1,26 @@
 from ctapipe.io.eventsourcefactory import EventSourceFactory
 from ctapipe.calib import CameraCalibrator
-from ctapipe.image.hillas import hillas_parameters
+from ctapipe.image.hillas import hillas_parameters, HillasParameterizationError
 from ctapipe.image.cleaning import tailcuts_clean
+from ctapipe.reco import HillasReconstructor
+
 import pandas as pd
 import fact.io
 import click
 import os
 import pyhessio
 import numpy as np
+from collections import namedtuple, Counter
+from tqdm import tqdm
+
+
+# do some horrible things to silence warnings in ctapipe
+import warnings
+from astropy.utils.exceptions import AstropyDeprecationWarning
+warnings.filterwarnings('ignore', category=AstropyDeprecationWarning, append=True)
+warnings.filterwarnings('ignore', category=FutureWarning, append=True)
+np.warnings.filterwarnings('ignore')
+
 
 names_to_id = {'LSTCam': 1, 'NectarCam': 2, 'FlashCam': 3, 'DigiCam': 4, 'CHEC': 5}
 types_to_id = {'LST': 1, 'MST': 2, 'SST': 3}
@@ -15,16 +28,19 @@ allowed_cameras = ['LSTCam', 'NectarCam', 'DigiCam']
 
 
 cleaning_level = {
-                    'ASTRICam': (5, 7),  # (5, 10)?
-                    'FlashCam': (12, 15),
-                    'LSTCam': (5, 10),  # ?? (3, 6) for Abelardo...
+                    'ASTRICam': (5, 7, 0),  # (5, 10)?
+                    'FlashCam': (12, 15, 0),
+                    'LSTCam': (4, 7, 2),  # ?? (3, 6) for Abelardo...
                     # ASWG Zeuthen talk by Abelardo Moralejo:
-                    'NectarCam': (4, 8),
+                    'NectarCam': (4, 8, 0),
                     # "FlashCam": (4, 8),  # there is some scaling missing?
-                    'DigiCam': (3, 6),
-                    'CHEC': (2, 4),
-                    'SCTCam': (1.5, 3)
+                    'DigiCam': (3, 6, 0),
+                    'CHEC': (2, 4, 0),
+                    'SCTCam': (1.5, 3, 0)
                     }
+
+# needed for directional reconstructor
+SubMomentParameters = namedtuple('SubMomentParameters', 'size,cen_x,cen_y,length,width,psi')
 
 
 @click.command()
@@ -60,32 +76,37 @@ def process_file(input_file, output_file, n_events=-1):
         input_url=input_file,
         max_events=n_events if n_events > 1 else None,
     )
-
     calibrator = CameraCalibrator(
-        event_source=event_source,
-        r1_product='HESSIOR1Calibrator',
+        eventsource=event_source,
     )
+    reco = HillasReconstructor()
 
 
-    image_features = []
+    telescope_event_information = []
     array_event_information = []
-    for event in event_source:
-        if number_of_valid_triggerd_cameras(event) >= 2:
-            f = calculate_image_features(event, calibrator)
-            if len(f) > 1:  # check whtehr at least two telescopes returned hillas features
-                array_event_information.append(event_information(event))
-                image_features.extend(f)
+    for event in tqdm(event_source):
+        if number_of_valid_triggerd_cameras(event) < 2:
+            continue
 
-    df_features = pd.DataFrame(image_features)
-    df_features.set_index('telescope_event_id', drop=True, verify_integrity=True, inplace=True)
-    fact.io.write_data(df_features, output_file, key='telescope_events', mode='a')
+        calibrator.calibrate(event)
+        try:
+            image_features, reconstruction = process_event(event, reco)
+            if len(image_features) > 1:  # check whtehr at least two telescopes returned hillas features
+                event_features = event_information(event, image_features, reconstruction)
+                array_event_information.append(event_features)
+                telescope_event_information.append(image_features)
+        except (NameError, HillasParameterizationError):
+            continue  # no signal in event or whatever kind of shit can happen here.
 
-    df_array = pd.DataFrame(array_event_information)
-    df_array.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
-    fact.io.write_data(df_array, output_file, key='array_events', mode='a')
+    telescope_events = pd.concat(telescope_event_information)
+    telescope_events.set_index(['run_id', 'array_event_id', 'telescope_id'], drop=True, verify_integrity=True, inplace=True)
+    fact.io.write_data(telescope_events, output_file, key='telescope_events', mode='a')
+
+    array_events = pd.DataFrame(array_event_information)
+    array_events.set_index(['run_id', 'array_event_id'], drop=True, verify_integrity=True, inplace=True)
+    fact.io.write_data(array_events, output_file, key='array_events', mode='a')
 
     run_information = read_simtel_mc_information(input_file)
-
     df_runs = pd.DataFrame([run_information])
     df_runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
     fact.io.write_data(df_runs, output_file, key='runs', mode='a')
@@ -97,14 +118,10 @@ def verify_file(input_file_path):
     runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
 
     telescope_events = fact.io.read_data(input_file_path, key='telescope_events')
-    telescope_events.set_index('telescope_event_id', drop=True, verify_integrity=True, inplace=True)
+    telescope_events.set_index(['run_id', 'array_event_id', 'telescope_id'], drop=True, verify_integrity=True, inplace=True)
 
     array_events = fact.io.read_data(input_file_path, key='array_events')
-    array_events.set_index('array_event_id', drop=True, verify_integrity=True, inplace=True)
-
-    assert len(array_events) == len(telescope_events.array_event_id.unique())
-    assert len(runs) == len(telescope_events.run_id.unique())
-    assert len(runs) == len(array_events.run_id.unique())
+    array_events.set_index(['run_id', 'array_event_id'], drop=True, verify_integrity=True, inplace=True)
 
     print(f'Processed {len(runs)} runs, {len(telescope_events)} single telescope events and {len(array_events)} array events.')
 
@@ -134,7 +151,8 @@ def read_simtel_mc_information(simtel_file):
         return d
 
 
-def event_information(event):
+def event_information(event, image_features, reconstruction):
+    counter = Counter(image_features.telescope_type_name)
     d = {
         'mc_alt': event.mc.alt,
         'mc_az': event.mc.az,
@@ -145,43 +163,53 @@ def event_information(event):
         'mc_energy': event.mc.energy.to('TeV').value,
         'mc_corsika_primary_id': event.mc.shower_primary_id,
         'run_id': event.r0.obs_id,
-        'array_event_id': generate_unique_array_event_id(event),
+        'array_event_id': event.dl0.event_id,
+        'alt_prediction': ((np.pi / 2) - reconstruction.alt.si.value),  # TODO srsly now? FFS
+        'az_prediction': reconstruction.az.si.value,
+        'core_x_prediction': reconstruction.core_x,
+        'core_y_prediction': reconstruction.core_y,
+        'h_max_prediction': reconstruction.h_max,
+        'total_intensity': image_features.intensity.sum(),
+        'num_triggered_lst': counter['LST'],
+        'num_triggered_mst': counter['MST'],
+        'num_triggered_sst': counter['SST'],
     }
 
     return {k: strip_unit(v) for k, v in d.items()}
 
 
-def calculate_image_features(event, calibrator):
+def process_event(event, reco):
     '''
     Processes
     '''
-    event_info = []
-    calibrator.calibrate(event)
 
+    features = {}
+    params = {}
+    pointing_azimuth = {}
+    pointing_altitude = {}
     for telescope_id, dl1 in event.dl1.tel.items():
         camera = event.inst.subarray.tels[telescope_id].camera
         if camera.cam_id not in allowed_cameras:
             continue
 
         telescope_type_name = event.inst.subarray.tels[telescope_id].optics.tel_type
-        boundary_thresh, picture_thresh = cleaning_level[camera.cam_id]
-        mask = tailcuts_clean(camera, dl1.image[0], boundary_thresh=boundary_thresh, picture_thresh=picture_thresh)
+        boundary_thresh, picture_thresh, min_number_picture_neighbors = cleaning_level[camera.cam_id]
+        mask = tailcuts_clean(camera, dl1.image[0], boundary_thresh=boundary_thresh, picture_thresh=picture_thresh, min_number_picture_neighbors=min_number_picture_neighbors)
 
-        if mask.sum() < 3:  # only two pixel remaining. No luck anyways.
-            continue
-
-        hillas_params = hillas_parameters(
+        h = hillas_parameters(
             camera[mask],
             dl1.image[0, mask],
             container=True
         )
-        if np.isnan(hillas_params.width.value) or np.isnan(hillas_params.length.value):
-            continue
 
+        moments = SubMomentParameters(size=h.intensity, cen_x=h.x, cen_y=h.y, length=h.length, width=h.width, psi=h.psi)
+        params[telescope_id] = moments
+        pointing_azimuth[telescope_id] = event.mc.az
+        pointing_altitude[telescope_id] = event.mc.alt
 
+        telescope_description = event.inst.subarray.tel[telescope_id]
         d = {
-            'array_event_id': generate_unique_array_event_id(event),
-            'telescope_event_id': generate_unique_telescope_event_id(event, int(telescope_id)),
+            'array_event_id': event.dl0.event_id,
             'telescope_id': int(telescope_id),
             'camera_name': camera.cam_id,
             'camera_id': names_to_id[camera.cam_id],
@@ -190,33 +218,28 @@ def calculate_image_features(event, calibrator):
             'telescope_type_id': types_to_id[telescope_type_name],
             'pointing_azimuth': event.mc.tel[telescope_id].azimuth_raw,
             'pointing_altitude': event.mc.tel[telescope_id].altitude_raw,
+            'mirror_area': telescope_description.optics.mirror_area,
+            'focal_length': telescope_description.optics.equivalent_focal_length,
         }
 
-        d.update(hillas_params.as_dict())
-        event_info.append({k: strip_unit(v) for k, v in d.items()})
+        d.update(h.as_dict())
+        features[telescope_id] = ({k: strip_unit(v) for k, v in d.items()})
 
-    return event_info
+    reconstruction = reco.predict(params, event.inst, pointing_azimuth, pointing_altitude)
+    for telescope_id in event.dl1.tel.keys():
+        camera = event.inst.subarray.tels[telescope_id].camera
+        if camera.cam_id not in allowed_cameras:
+            continue
 
+        pos = event.inst.subarray.positions[telescope_id]
+        x, y = pos[0], pos[1]
+        core_x = reconstruction.core_x
+        core_y = reconstruction.core_y
+        d = np.sqrt((core_x - x)**2 + (core_y - y)**2)
+        features[telescope_id]['distance_to_core'] = d.value
 
-def pair(a, b):
-    ''' implmentation of the "elegant pairing function" http://szudzik.com/ElegantPairing.pdf '''
-    p = b**2 + a if b > a else a**2 + a + b
-    try:
-        is_valid_numpy_int = p.dtype in [np.int16, np.int32, np.int64]
-        if is_valid_numpy_int:
-            return p
-    except AttributeError:
-        if int(p).bit_length > 63:
-            raise ValueError(f'"{a}" and "{b}" cannot be paired. Value exceeds 64 bits.')
-        return p
+    return pd.DataFrame(list(features.values())), reconstruction
 
-
-def generate_unique_array_event_id(event):
-    return pair(event.r0.obs_id, event.r0.event_id)
-
-
-def generate_unique_telescope_event_id(event, telescope_id):
-    return pair(generate_unique_array_event_id(event), telescope_id)
 
 
 def number_of_valid_triggerd_cameras(event):
