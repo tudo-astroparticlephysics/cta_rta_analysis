@@ -1,13 +1,15 @@
 from scipy.optimize import minimize_scalar
 from fact.analysis import li_ma_significance
 import astropy.units as u
+from astropy.table import Table
 import numpy as np
 import pandas as pd
 from spectrum import CrabSpectrum
 import multiprocessing
 from joblib import delayed, Parallel
 from scipy import optimize
-import tqdm
+from tqdm import tqdm
+from astropy.table import QTable
 
 
 @u.quantity_input(t_obs=u.hour, t_ref=u.hour)
@@ -63,6 +65,16 @@ def relative_sensitivity(
     return scale
 
 
+def read_sensitivity_fits(fits_file):
+    table = QTable.read(fits_file)
+    bin_edges = list(sorted(set(table['left_edge']) | set(table['right_edge']))) * u.TeV
+
+    # log bin center
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    bin_widths = np.diff(bin_edges)
+
+    return table, bin_edges, bin_centers, bin_widths
+
 
 
 def calculate_sensitivity(
@@ -108,9 +120,7 @@ def get_on_and_off_counts(selected_protons, selected_gammas, signal_region_radiu
     # smallish theta area around 0. take the mean of the thata square histogram
     # to get a more stable estimate for n_off
     background_region_radius = signal_region_radius
-    # # print(selected_protons.theta.count(), selected_protons.weight.count())
-    # if selected_protons.weight.count() == 30:
-    #     print(selected_protons.weight)
+
     b = np.nanpercentile(selected_protons.theta**2, 68)
 
     if b == np.nan:
@@ -134,8 +144,9 @@ def find_differential_sensitivity(
             gammas,
             bin_edges,
             target_spectrum=CrabSpectrum(),
-            num_threads=-1
+            num_threads=-1,
         ):
+
 
     gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
     protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
@@ -145,32 +156,41 @@ def find_differential_sensitivity(
 
     if num_threads > 1:
         d = (
-            delayed(find_best_sensitivity_in_bin)
-            (gammas[gammas.energy_bin == b], protons[protons.energy_bin == b]) for b in gammas.energy_bin.cat.categories
+            delayed(_find_best_sensitivity_in_bin)
+            (gammas[gammas.energy_bin == b], protons[protons.energy_bin == b], b) for b in gammas.energy_bin.cat.categories
         )
 
-        sensitivity = Parallel(n_jobs=num_threads, verbose=10)(d)
+        results = Parallel(n_jobs=num_threads, verbose=10)(d)
     else:
-        sensitivity = [find_best_sensitivity_in_bin(gammas[gammas.energy_bin == b], protons[protons.energy_bin == b]) for b in tqdm(gammas.energy_bin.cat.categories)]
-
+        results = [_find_best_sensitivity_in_bin(gammas[gammas.energy_bin == b], protons[protons.energy_bin == b], b) for b in tqdm(gammas.energy_bin.cat.categories)]
 
 
     # multiply the whole thing by the proper unit. There must be a nicer way to do this.
-    sensitivity = np.array([s.value for s in sensitivity]) * sensitivity[0].unit
-    return sensitivity
+    sensitivity = np.array([s[0].value for s in results]) * results[0][0].unit
+    return sensitivity, _optimizer_result_to_table(results)
 
 
-def find_best_sensitivity_in_bin(g, p):
+def _optimizer_result_to_table(result):
+    d = [{'left_edge': bin.left, 'right_edge': bin.right, 'flux': flux.value, 'threshold': cut[0], 'radius': cut[1]} for flux, cut, bin in result]
+    t = Table(d)
+    t['flux'] = t['flux'] * result[0][0].unit
+    t['radius'] = t['radius'] * u.deg**2
+    t['left_edge'] = t['left_edge'] * u.TeV
+    t['right_edge'] = t['right_edge'] * u.TeV
+    return t
+
+
+def _find_best_sensitivity_in_bin(g, p, bin):
 
     def f(x):
         return calculate_sensitivity(g, p, gamma_prediction_mean=x[0], signal_region=x[1]).value
 
     # ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.08, 0.001))
-    ranges = (slice(0.0, 1, 0.05), slice(0.001, 0.1, 0.0025))
+    ranges = (slice(0.0, 1, 0.2), slice(0.001, 0.1, 0.01))
     # Note: while it seems obviuous to use finish=optimize.fmin here. apparently it
     # tests invalid values. and then everything breaks. Negative theta cuts for
     # example
     res = optimize.brute(f, ranges, finish=None, full_output=True)
 
     cuts = res[0]
-    return calculate_sensitivity(g, p, gamma_prediction_mean=cuts[0], signal_region=cuts[1])
+    return calculate_sensitivity(g, p, gamma_prediction_mean=cuts[0], signal_region=cuts[1]), cuts, bin
