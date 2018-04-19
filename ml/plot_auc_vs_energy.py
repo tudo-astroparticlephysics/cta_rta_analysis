@@ -2,39 +2,11 @@ import click
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
 import fact.io
 
 columns = ['array_event_id', 'gamma_prediction', 'telescope_type_name']
-
-
-def add_rectangles(ax, offset=0.1):
-
-    kwargs = {
-        'linewidth': 1,
-        'edgecolor': 'white',
-        'facecolor': 'white',
-        'alpha': 0.6,
-    }
-
-    # left
-    rect = patches.Rectangle((0 - offset, 0), 0 + offset, 1 + offset, **kwargs)
-    ax.add_patch(rect)
-
-    # right
-    rect = patches.Rectangle((1, 0 - offset), 0 + offset, 1 + offset, **kwargs)
-    ax.add_patch(rect)
-
-    # top
-    rect = patches.Rectangle((0, 1), 1 + offset, 0 + offset, **kwargs)
-    ax.add_patch(rect)
-
-    # bottom
-    rect = patches.Rectangle((0 - offset, 0), 1 + offset, 0 - offset, **kwargs)
-    ax.add_patch(rect)
-
 
 
 @click.command()
@@ -53,7 +25,8 @@ def add_rectangles(ax, offset=0.1):
         exists=False,
         dir_okay=False,
     ))
-def main(predicted_gammas, predicted_protons, output):
+@click.option('-b', '--n_bins', default=20, help='number of enrgy bins to plot')
+def main(predicted_gammas, predicted_protons, output, n_bins):
     telecope_events = fact.io.read_data(predicted_gammas, key='telescope_events', columns=columns).dropna()
     array_events = fact.io.read_data(predicted_gammas, key='array_events', columns=['array_event_id', 'mc_energy'])
     gammas = pd.merge(telecope_events, array_events, on='array_event_id')
@@ -62,15 +35,16 @@ def main(predicted_gammas, predicted_protons, output):
     array_events = fact.io.read_data(predicted_protons, key='array_events', columns=['array_event_id', 'mc_energy'])
     protons = pd.merge(telecope_events, array_events, on='array_event_id')
 
-
-    bin_edges = np.logspace(-2, 2, 50)
+    e_min, e_max = 0.003, 300
+    bin_edges = np.logspace(np.log10(e_min), np.log10(e_max), n_bins)
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
     bin_widths = np.diff(bin_edges)
 
     gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
     protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
 
-    for tel_type in ['SST', 'MST', 'LST']:
+    color = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for tel_type, c in zip(['SST', 'MST', 'LST'], color):
         aucs = []
         for b in tqdm(gammas.energy_bin.cat.categories):
 
@@ -78,7 +52,7 @@ def main(predicted_gammas, predicted_protons, output):
             tel_protons = protons[(protons.energy_bin == b) & (protons.telescope_type_name == tel_type)]
 
             if len(tel_gammas) < 30 or len(tel_protons) < 30:
-                aucs.append(0)
+                aucs.append(np.nan)
             else:
                 mean_prediction_gammas = tel_gammas.groupby('array_event_id')['gamma_prediction'].mean()
                 gamma_labels = np.ones_like(mean_prediction_gammas)
@@ -96,8 +70,12 @@ def main(predicted_gammas, predicted_protons, output):
             bin_centers,
             aucs,
             xerr=bin_widths / 2.0,
-            linestyle='',
-            label=tel_type
+            linestyle='--',
+            label=tel_type,
+            ecolor='gray',
+            ms=0,
+            capsize=0,
+            color=c,
         )
 
     plt.ylim([0, 1])

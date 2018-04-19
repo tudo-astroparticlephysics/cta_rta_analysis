@@ -52,8 +52,8 @@ def add_rectangles(ax, offset=0.1):
 def main(predicted_gammas, predicted_protons, output):
     cols=['gamma_prediction', 'array_event_id', 'telescope_type_name']
 
-    gammas = fact.io.read_data(predicted_gammas, key='telescope_events', columns=cols).dropna()
-    protons = fact.io.read_data(predicted_protons, key='telescope_events',  columns=cols).dropna()
+    gammas = fact.io.read_data(predicted_gammas, key='telescope_events',columns=cols).dropna()
+    protons = fact.io.read_data(predicted_protons, key='telescope_events', columns=cols).dropna()
 
     for tel_type in ['SST', 'MST', 'LST']:
         tel_gammas = gammas.query(f'telescope_type_name == "{tel_type}"')
@@ -71,7 +71,7 @@ def main(predicted_gammas, predicted_protons, output):
         fpr, tpr, _ = roc_curve(y_true, y_score, pos_label=1)
         auc = roc_auc_score(y_true, y_score)
 
-        plt.plot(fpr, tpr, lw=1, label=f'AUC for {tel_type}: {auc}')
+        plt.plot(fpr, tpr, lw=1, label=f'AUC for {tel_type}:  {auc:{1}.{4}}')
 
     add_rectangles(plt.gca())
     plt.legend()
