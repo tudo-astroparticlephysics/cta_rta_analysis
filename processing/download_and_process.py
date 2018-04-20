@@ -37,7 +37,12 @@ def get_links(type, password):
 
     print('Status code: {}'.format(r.status_code))
 
-    regex = r"href=\"({}_20deg_0deg.+?NGFD.simtel.gz)".format(type)
+    if type == 'gamma_diffuse':
+        type = 'gamma'
+        regex = r"href=\"({}_20deg_0deg.+?NGFD_cone10.simtel.gz)".format(type)
+    else:
+        regex = r"href=\"({}_20deg_0deg.+?NGFD.simtel.gz)".format(type)
+
     links = re.findall(regex, r.text)
     return links
 
@@ -45,7 +50,7 @@ def get_links(type, password):
 @click.command()
 @click.argument('outputfile', type=click.Path(exists=False))
 @click.option('-p', '--password')
-@click.option('-t', '--type', type=click.Choice(['gamma', 'proton']), default='proton')
+@click.option('-t', '--type', type=click.Choice(['gamma', 'proton', 'gamma_diffuse']), default='proton')
 def main(outputfile, password, type):
 
     if os.path.exists(outputfile):
@@ -54,6 +59,7 @@ def main(outputfile, password, type):
 
     links = get_links(type, password)
     print(f'Found {len(links)} links')
+
     for filename in tqdm(links):
         download_file(filename, password)
         process_file(filename, outputfile)
