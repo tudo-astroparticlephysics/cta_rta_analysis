@@ -41,11 +41,13 @@ SubMomentParameters = namedtuple('SubMomentParameters', 'size,cen_x,cen_y,length
     ))
 @click.option('-n', '--n_jobs', help='Number of threads to use', default=-1)
 @click.option('-t', '--tel_type', help='Telescope Types to use', type=click.Choice(['all', 'MST', 'SST', 'LST']), default='all')
-def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_type):
+@click.option('-y', '--yes', help='Override all prompts. Overwrites exisitng files', default=False)
+def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_type, yes):
 
 
     if os.path.exists(output_file_path):
-        click.confirm(f'File {output_file_path} exists. Overwrite?', default=False, abort=True)
+        if not yes:
+            click.confirm(f'File {output_file_path} exists. Overwrite?', default=False, abort=True)
         os.remove(output_file_path)
 
     instrument = pickle.load(open(instrument_description, 'rb'))
@@ -83,6 +85,15 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_
 
     array_events = pd.concat([array_events, array_features], axis=1)
     telescope_events = pd.concat([telescope_events, telescope_features], axis=1)
+
+    if 'gamma_prediction' in telescope_events.columns:
+        array_events['gamma_prediction_mean'] = telescope_events.groupby('array_event_id')['gamma_prediction'].mean()
+        array_events['gamma_prediction_std'] = telescope_events.groupby('array_event_id')['gamma_prediction'].std()
+    if 'gamma_energy_prediction' in telescope_events.columns:
+        array_events['gamma_energy_prediction_mean'] = telescope_events.groupby('array_event_id')['gamma_energy_prediction'].mean()
+        array_events['gamma_energy_prediction_std'] = telescope_events.groupby('array_event_id')['gamma_energy_prediction'].std()
+
+
 
     fact.io.write_data(runs, output_file_path, key='runs')
     array_events.reset_index(drop=True, inplace=True)
