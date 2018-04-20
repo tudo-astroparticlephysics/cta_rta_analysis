@@ -41,7 +41,7 @@ SubMomentParameters = namedtuple('SubMomentParameters', 'size,cen_x,cen_y,length
     ))
 @click.option('-n', '--n_jobs', help='Number of threads to use', default=-1)
 @click.option('-t', '--tel_type', help='Telescope Types to use', type=click.Choice(['all', 'MST', 'SST', 'LST']), default='all')
-@click.option('-y', '--yes', help='Override all prompts. Overwrites exisitng files', default=False)
+@click.option('-y', '--yes', help='Override all prompts. Overwrites exisitng files', default=False, is_flag=True)
 def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_type, yes):
 
 
