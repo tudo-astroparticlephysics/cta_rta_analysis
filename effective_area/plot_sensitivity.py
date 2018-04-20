@@ -19,7 +19,7 @@ def plot_sensitivity(bin_edges, sensitivity, t_obs, sensitivity_std,  ax=None, s
 
     sensitivity = sensitivity.to(1 / (u.erg * u.s * u.cm**2))
 
-    if sensitivity is not None:
+    if sensitivity_std is not None:
         y_error = True
         sensitivity_std = sensitivity_std.to(1 / (u.erg * u.s * u.cm**2))
 
@@ -104,8 +104,12 @@ def main(
     for fits_file, l, c in zip(input_fits, label, color):
         table, bin_edges, _, _ = read_sensitivity_fits(fits_file)
         sens = table['flux'].to(1 / (u.erg * u.s * u.cm**2))
-        flux_std = table['flux_std'].to(1 / (u.erg * u.s * u.cm**2))
-        ax = plot_sensitivity(bin_edges, sens, t_obs, sensitivity_std=flux_std, ax=None, label=l, color=c)
+        if 'flux_std' in table.colnames:
+            flux_std = table['flux_std'].to(1 / (u.erg * u.s * u.cm**2))
+        else:
+            flux_std = None    
+    
+    ax = plot_sensitivity(bin_edges, sens, t_obs, sensitivity_std=flux_std, ax=None, label=l, color=c)
 
     plot_spectrum(CrabSpectrum(), 0.003 * u.TeV, 300 * u.TeV, ax=ax, color='gray')
 
