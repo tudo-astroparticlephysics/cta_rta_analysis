@@ -186,7 +186,7 @@ def _find_best_sensitivity_in_bin(g, p, bin):
         return calculate_sensitivity(g, p, gamma_prediction_mean=x[0], signal_region=x[1]).value
 
     # ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.08, 0.001))
-    ranges = (slice(0.0, 1, 0.2), slice(0.001, 0.1, 0.01))
+    ranges = (slice(0.0, 1, 0.025), slice(0.0, 0.3, 0.005))
     # Note: while it seems obviuous to use finish=optimize.fmin here. apparently it
     # tests invalid values. and then everything breaks. Negative theta cuts for
     # example
