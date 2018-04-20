@@ -135,24 +135,24 @@ $(plot_effective_area): $(gamma_test) effective_area/plot_effective_area.py
 	python effective_area/plot_effective_area.py -g $(gamma_test) -o $(plot_effective_area)
 
 
-$(sensitivity_sst_fits): $(gamma_test) $(proton_test)
+$(sensitivity_sst_fits): $(gamma_test_sst) $(proton_test_sst)
 	python effective_area/calculate_sensitivity.py $(gamma_test_sst) $(proton_test_sst) $(sensitivity_sst_fits) -n 20
 $(plot_sensitivity_sst): $(sensitivity_sst_fits)
 	python effective_area/plot_sensitivity.py   $(sensitivity_sst_fits)  -o $(plot_sensitivity_sst)
 
-$(sensitivity_mst_fits): $(gamma_test) $(proton_test)
+$(sensitivity_mst_fits): $(gamma_test_mst) $(proton_test_mst)
 	python effective_area/calculate_sensitivity.py $(gamma_test_mst) $(proton_test_mst) $(sensitivity_mst_fits) -n 20
 $(plot_sensitivity_mst): $(sensitivity_mst_fits)
 	python effective_area/plot_sensitivity.py   $(sensitivity_mst_fits)  -o $(plot_sensitivity_mst)
 
-$(sensitivity_lst_fits): $(gamma_test) $(proton_test)
+$(sensitivity_lst_fits): $(gamma_test_lst) $(proton_test_lst)
 	python effective_area/calculate_sensitivity.py $(gamma_test_lst) $(proton_test_lst) $(sensitivity_lst_fits) -n 20
 $(plot_sensitivity_lst): $(sensitivity_sst_fits)
 	python effective_area/plot_sensitivity.py   $(sensitivity_lst_fits)  -o $(plot_sensitivity_lst)
 
 
 $(sensitivity_all_fits): $(gamma_test) $(proton_test)
-	python effective_area/calculate_sensitivity.py $(gamma_test) $(proton_test) $(sensitivity_all_fits) -n 20 -j 4
+	python effective_area/calculate_sensitivity.py $(gamma_test) $(proton_test) $(sensitivity_all_fits) -n 20
 $(plot_sensitivity_all): $(sensitivity_all_fits)
 	python effective_area/plot_sensitivity.py   $(sensitivity_all_fits)  -o $(plot_sensitivity_all)
 
