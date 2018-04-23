@@ -74,25 +74,29 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_
         results = [reconstruct_direction(array_event_id, group, instrument=instrument) for array_event_id, group in tqdm(events.groupby(['run_id', 'array_event_id']))]
 
 
-    telescope_features = pd.DataFrame(list(chain.from_iterable([r[1] for r in results])))
+    telescope_features = pd.DataFrame(list(chain.from_iterable([r[1] for r in results if r is not None])))
     telescope_features.set_index(['run_id', 'array_event_id', 'telescope_id'], inplace=True)
 
-    array_features = pd.DataFrame([r[0] for r in results])
+    array_features = pd.DataFrame([r[0] for r in results if r is not None])
     array_features.set_index(['run_id', 'array_event_id'], inplace=True)
 
     if tel_type == 'all':
         assert len(results) == len(array_events)
+    
+    columns_to_delete = set(array_features.columns) & set(array_events.columns)
+    array_events.drop(columns=columns_to_delete, inplace=True)
+    array_events = pd.merge(left=array_features, right=array_events, left_index=True, right_index=True)
 
-    array_events = pd.concat([array_events, array_features], axis=1)
-    telescope_events = pd.concat([telescope_events, telescope_features], axis=1)
-
+    columns_to_delete = set(telescope_features.columns) & set(telescope_events.columns)
+    telescope_events.drop(columns=columns_to_delete, inplace=True)
+    telescope_events = pd.merge(left=telescope_features, right=telescope_events, left_index=True, right_index=True)
+    
     if 'gamma_prediction' in telescope_events.columns:
-        array_events['gamma_prediction_mean'] = telescope_events.groupby('array_event_id')['gamma_prediction'].mean()
-        array_events['gamma_prediction_std'] = telescope_events.groupby('array_event_id')['gamma_prediction'].std()
+        array_events['gamma_prediction_mean'] = telescope_events.groupby(['run_id', 'array_event_id'])['gamma_prediction'].mean()
+        array_events['gamma_prediction_std'] = telescope_events.groupby(['run_id', 'array_event_id'])['gamma_prediction'].std()
     if 'gamma_energy_prediction' in telescope_events.columns:
-        array_events['gamma_energy_prediction_mean'] = telescope_events.groupby('array_event_id')['gamma_energy_prediction'].mean()
-        array_events['gamma_energy_prediction_std'] = telescope_events.groupby('array_event_id')['gamma_energy_prediction'].std()
-
+        array_events['gamma_energy_prediction_mean'] = telescope_events.groupby(['run_id', 'array_event_id'])['gamma_energy_prediction'].mean()
+        array_events['gamma_energy_prediction_std'] = telescope_events.groupby(['run_id', 'array_event_id'])['gamma_energy_prediction'].std()
 
 
     fact.io.write_data(runs, output_file_path, key='runs')
@@ -134,10 +138,10 @@ def reconstruct_direction(array_event_id, group, instrument):
             'array_event_id': array_event_id,
             'run_id': group.run_id.iloc[0],
             'h_max_prediction': reconstruction.h_max.si.value,
-            'total_signal': total_signal,
-            'n_lst': c['LST'],
-            'n_mst': c['MST'],
-            'n_sst': c['SST'],
+            'total_intensity': total_signal,
+            'num_triggered_lst': c['LST'],
+            'num_triggered_mst': c['MST'],
+            'num_triggered_sst': c['SST'],
             }
 
     tel_wise = []
