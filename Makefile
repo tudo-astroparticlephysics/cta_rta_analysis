@@ -46,14 +46,14 @@ predictions_regressor = $(build_dir)/klaas_predictions_regression.hdf5
 model_regressor = $(build_dir)/regressor.pkl
 config_regressor = configs/regressor.yaml
 
-gamma_test_sst = $(build_dir)/gamma_test_sst.hdf5
-proton_test_sst = $(build_dir)/proton_test_sst.hdf5
+gamma_test_sst = $(build_dir)/gammas_test_sst.hdf5
+proton_test_sst = $(build_dir)/protons_test_sst.hdf5
 
-gamma_test_mst = $(build_dir)/gamma_test_mst.hdf5
-proton_test_mst = $(build_dir)/proton_test_mst.hdf5
+gamma_test_mst = $(build_dir)/gammas_test_mst.hdf5
+proton_test_mst = $(build_dir)/protons_test_mst.hdf5
 
-gamma_test_lst = $(build_dir)/gamma_test_lst.hdf5
-proton_test_lst = $(build_dir)/proton_test_lst.hdf5
+gamma_test_lst = $(build_dir)/gammas_test_lst.hdf5
+proton_test_lst = $(build_dir)/protons_test_lst.hdf5
 
 
 all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_roc_per_telescope) $(plot_auc_vs_energy) $(plot_angular_resolution) $(plot_ang_res_energy) $(plot_effective_area) $(plot_sensitivity_all) $(plot_sensitivity_sst) $(plot_sensitivity_lst) $(plot_sensitivity_mst)
@@ -147,7 +147,7 @@ $(plot_sensitivity_mst): $(sensitivity_mst_fits)
 
 $(sensitivity_lst_fits): $(gamma_test_lst) $(proton_test_lst)
 	python effective_area/calculate_sensitivity.py $(gamma_test_lst) $(proton_test_lst) $(sensitivity_lst_fits) -n 20
-$(plot_sensitivity_lst): $(sensitivity_sst_fits)
+$(plot_sensitivity_lst): $(sensitivity_lst_fits)
 	python effective_area/plot_sensitivity.py   $(sensitivity_lst_fits)  -o $(plot_sensitivity_lst)
 
 
