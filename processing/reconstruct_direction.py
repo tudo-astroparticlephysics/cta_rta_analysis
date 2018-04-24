@@ -67,6 +67,7 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_
     events = pd.merge(left=array_events, right=telescope_events, left_on=['run_id', 'array_event_id'], right_on=['run_id', 'array_event_id']).dropna()
     if n_events > 1:
         events = events[0:n_events]
+        print(f'Reconstruncting {len(events) events.}')
 
     if n_jobs == -1:
         n_jobs = multiprocessing.cpu_count() // 2
