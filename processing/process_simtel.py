@@ -12,7 +12,7 @@ import pyhessio
 import numpy as np
 from collections import namedtuple, Counter
 from tqdm import tqdm
-
+import astropy.units as u
 
 # do some horrible things to silence warnings in ctapipe
 import warnings
@@ -66,12 +66,15 @@ def main(input_files, output_file, n_events):
 
     for input_file in input_files:
         print(f'processing file {input_file}')
-        process_file(input_file, output_file, n_events)
+        runs, array_events, telescope_events = process_file(input_file, n_events)
+        fact.io.write_data(runs, output_file, key='runs', mode='a')
+        fact.io.write_data(array_events, output_file, key='array_events', mode='a')
+        fact.io.write_data(telescope_events, output_file, key='telescope_events', mode='a')
 
     verify_file(output_file)
 
 
-def process_file(input_file, output_file, n_events=-1):
+def process_file(input_file, n_events=-1):
     event_source = EventSourceFactory.produce(
         input_url=input_file,
         max_events=n_events if n_events > 1 else None,
@@ -100,16 +103,17 @@ def process_file(input_file, output_file, n_events=-1):
 
     telescope_events = pd.concat(telescope_event_information)
     telescope_events.set_index(['run_id', 'array_event_id', 'telescope_id'], drop=True, verify_integrity=True, inplace=True)
-    fact.io.write_data(telescope_events, output_file, key='telescope_events', mode='a')
+
 
     array_events = pd.DataFrame(array_event_information)
     array_events.set_index(['run_id', 'array_event_id'], drop=True, verify_integrity=True, inplace=True)
-    fact.io.write_data(array_events, output_file, key='array_events', mode='a')
+
 
     run_information = read_simtel_mc_information(input_file)
     df_runs = pd.DataFrame([run_information])
     df_runs.set_index('run_id', drop=True, verify_integrity=True, inplace=True)
-    fact.io.write_data(df_runs, output_file, key='runs', mode='a')
+
+    return df_runs, array_events, telescope_events
 
 
 
@@ -164,7 +168,7 @@ def event_information(event, image_features, reconstruction):
         'mc_corsika_primary_id': event.mc.shower_primary_id,
         'run_id': event.r0.obs_id,
         'array_event_id': event.dl0.event_id,
-        'alt_prediction': ((np.pi / 2) - reconstruction.alt.si.value),  # TODO srsly now? FFS
+        'alt_prediction': reconstruction.alt.si.value,
         'az_prediction': reconstruction.az.si.value,
         'core_x_prediction': reconstruction.core_x,
         'core_y_prediction': reconstruction.core_y,
@@ -204,8 +208,9 @@ def process_event(event, reco):
 
         moments = SubMomentParameters(size=h.intensity, cen_x=h.x, cen_y=h.y, length=h.length, width=h.width, psi=h.psi)
         params[telescope_id] = moments
-        pointing_azimuth[telescope_id] = event.mc.az
-        pointing_altitude[telescope_id] = event.mc.alt
+
+        pointing_azimuth[telescope_id] = event.mc.tel[telescope_id].azimuth_raw * u.rad
+        pointing_altitude[telescope_id] = ((np.pi / 2) - event.mc.tel[telescope_id].altitude_raw) * u.rad   # TODO srsly now? FFS
 
         telescope_description = event.inst.subarray.tel[telescope_id]
         d = {
