@@ -42,8 +42,8 @@ SubMomentParameters = namedtuple('SubMomentParameters', 'size,cen_x,cen_y,length
 @click.option('-n', '--n_jobs', help='Number of threads to use', default=-1)
 @click.option('-t', '--tel_type', help='Telescope Types to use', type=click.Choice(['all', 'MST', 'SST', 'LST']), default='all')
 @click.option('-y', '--yes', help='Override all prompts. Overwrites exisitng files', default=False, is_flag=True)
-@click.option('-e', '--n_events', help='Number of events to reconstruct', default=-1,)
-def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_type, yes, n_events):
+@click.option('-l', '--event_limit', help='Number of events to reconstruct', default=-1,)
+def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_type, yes, event_limit):
 
 
     if os.path.exists(output_file_path):
@@ -65,8 +65,8 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_
     array_events.set_index(['run_id', 'array_event_id'], verify_integrity=True, inplace=True, drop=False)
 
     events = pd.merge(left=array_events, right=telescope_events, left_on=['run_id', 'array_event_id'], right_on=['run_id', 'array_event_id']).dropna()
-    if n_events > 1:
-        events = events[0:n_events]
+    if event_limit > 1:
+        events = events[0:event_limit]
         print(f'Reconstruncting {len(events) events.}')
 
     if n_jobs == -1:
