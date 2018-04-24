@@ -80,9 +80,6 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_
     array_features = pd.DataFrame([r[0] for r in results if r is not None])
     array_features.set_index(['run_id', 'array_event_id'], inplace=True)
 
-    if tel_type == 'all':
-        assert len(results) == len(array_events)
-    
     columns_to_delete = set(array_features.columns) & set(array_events.columns)
     array_events.drop(columns=columns_to_delete, inplace=True)
     array_events = pd.merge(left=array_features, right=array_events, left_index=True, right_index=True)
@@ -90,7 +87,7 @@ def main(input_file_path, output_file_path, instrument_description, n_jobs, tel_
     columns_to_delete = set(telescope_features.columns) & set(telescope_events.columns)
     telescope_events.drop(columns=columns_to_delete, inplace=True)
     telescope_events = pd.merge(left=telescope_features, right=telescope_events, left_index=True, right_index=True)
-    
+
     if 'gamma_prediction' in telescope_events.columns:
         array_events['gamma_prediction_mean'] = telescope_events.groupby(['run_id', 'array_event_id'])['gamma_prediction'].mean()
         array_events['gamma_prediction_std'] = telescope_events.groupby(['run_id', 'array_event_id'])['gamma_prediction'].std()
