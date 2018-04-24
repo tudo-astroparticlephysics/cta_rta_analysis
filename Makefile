@@ -28,7 +28,7 @@ plot_sensitivity_lst = $(build_dir)/sensitivity_lst.pdf
 
 plot_sensitivity_combined = $(build_dir)/sensitivity_combined.pdf
 
-
+gamma_diffuse_output = $(data_dir)/dl2/gammas_diffuse.hdf5
 gamma_output = $(data_dir)/dl2/gammas.hdf5
 proton_output = $(data_dir)/dl2/protons.hdf5
 
@@ -78,11 +78,19 @@ $(model_regressor) $(predictions): $(gamma_train) $(config_regressor)
 	klaas_train_energy_regressor $(config_regressor) $(gamma_train) $(predictions_regressor) $(model_regressor)
 
 
-$(build_dir)/APPLICATION_DONE: $(proton_train) $(gamma_train) $(model_separator) $(config_separator) $(gamma_test) $(proton_test) $(model_regressor)
+$(build_dir)/APPLICATION_DONE: $(model_separator) $(config_separator) $(gamma_test) $(proton_test) $(model_regressor)
 	klaas_apply_separation_model $(config_separator) $(gamma_test) $(model_separator) --yes --chunksize 100000
 	klaas_apply_separation_model $(config_separator) $(proton_test) $(model_separator) --yes --chunksize 100000
 	klaas_apply_energy_regressor $(config_regressor) $(gamma_test) $(model_regressor) --yes --chunksize 100000
 	touch $(build_dir)/APPLICATION_DONE
+
+
+$(build_dir)/APPLICATION_DIFFUSE_DONE: $(model_separator) $(config_separator) $(gamma_test) $(model_regressor)
+	cp $(gamma_diffuse_output) $(build_dir)/gammas_diffuse.hdf5
+	klaas_apply_separation_model $(config_separator) $(build_dir)/gammas_diffuse.hdf5 $(model_separator) --yes --chunksize 100000
+	klaas_apply_energy_regressor $(config_regressor) $(build_dir)/gammas_diffuse.hdf5 $(model_regressor) --yes --chunksize 100000
+	touch $(build_dir)/APPLICATION_DIFFUSE_DONE
+
 
 
 
