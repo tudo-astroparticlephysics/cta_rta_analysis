@@ -117,18 +117,17 @@ def reconstruct_direction(array_event_id, group, instrument):
         moments = SubMomentParameters(size=row.intensity, cen_x=row.x * u.m, cen_y=row.y * u.m, length=row.length * u.m, width=row.width * u.m, psi=row.psi * u.rad)
         params[tel_id] = moments
         pointing_azimuth[tel_id] = row.pointing_azimuth * u.rad
-        pointing_altitude[tel_id] = row.pointing_altitude * u.rad
-
+        pointing_altitude[tel_id] = ((np.pi/2) - row.pointing_altitude) * u.rad
+# ((np.pi/2) - event.mc.tel[telescope_id].altitude_raw )* u.rad
     try:
         reconstruction = reco.predict(params, instrument, pointing_azimuth, pointing_altitude)
     except NameError:
         return None
 
-    reconstruction = reco.predict(params, instrument, pointing_azimuth, pointing_altitude)
     c = Counter(group.telescope_type_name)
     total_signal = group.intensity.sum()
 
-    event_features = {'alt_prediction': ((np.pi / 2) - reconstruction.alt.si.value),  # TODO srsly now? FFS
+    event_features = {'alt_prediction': reconstruction.alt.si.value,  # TODO srsly now? FFS
             'az_prediction': reconstruction.az.si.value,
             'core_x_prediction': reconstruction.core_x.si.value,
             'core_y_prediction': reconstruction.core_y.si.value,
