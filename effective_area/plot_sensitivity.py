@@ -90,13 +90,13 @@ def main(
     if label and len(input_fits) != len(label):
         print('Must pass as many labels as gamma files as proton files')
 
-    if color and len(label) != len(color):
+    if color and label and len(label) != len(color):
         print('Must pass as many colors as labels')
 
     t_obs = 50 * u.h
 
     if not label:
-        label = [None] * len(input_fits)
+        label = input_fits
 
     if not color:
         color = [None] * len(input_fits)
@@ -107,9 +107,9 @@ def main(
         if 'flux_std' in table.colnames:
             flux_std = table['flux_std'].to(1 / (u.erg * u.s * u.cm**2))
         else:
-            flux_std = None    
-    
-    ax = plot_sensitivity(bin_edges, sens, t_obs, sensitivity_std=flux_std, ax=None, label=l, color=c)
+            flux_std = None
+
+        ax = plot_sensitivity(bin_edges, sens, t_obs, sensitivity_std=flux_std, ax=None, label=l, color=c)
 
     plot_spectrum(CrabSpectrum(), 0.003 * u.TeV, 300 * u.TeV, ax=ax, color='gray')
 
