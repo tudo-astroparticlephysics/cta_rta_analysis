@@ -88,6 +88,7 @@ def process_file(input_file, n_events=-1, silent=False):
     event_source = EventSourceFactory.produce(
         input_url=input_file,
         max_events=n_events if n_events > 1 else None,
+        product='HESSIOEventSource',
     )
     calibrator = CameraCalibrator(
         eventsource=event_source,
