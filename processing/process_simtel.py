@@ -3,6 +3,7 @@ from ctapipe.calib import CameraCalibrator
 from ctapipe.image.hillas import hillas_parameters, HillasParameterizationError
 from ctapipe.image.cleaning import tailcuts_clean
 from ctapipe.reco import HillasReconstructor
+from joblib import Parallel, delayed
 
 import pandas as pd
 import fact.io
@@ -54,7 +55,8 @@ SubMomentParameters = namedtuple('SubMomentParameters', 'size,cen_x,cen_y,length
         dir_okay=False,
     ))
 @click.option('-n', '--n_events', default=-1)
-def main(input_files, output_file, n_events):
+@click.option('-j', '--n_jobs', default=1)
+def main(input_files, output_file, n_events, n_jobs):
     '''
     process multiple simtel files into one hdf containing three groups.
     'runs', 'array_events', 'telescope_events'
@@ -64,17 +66,25 @@ def main(input_files, output_file, n_events):
         click.confirm(f'File {output_file} exists. Overwrite?', default=False, abort=True)
         os.remove(output_file)
 
-    for input_file in input_files:
-        print(f'processing file {input_file}')
-        runs, array_events, telescope_events = process_file(input_file, n_events)
-        fact.io.write_data(runs, output_file, key='runs', mode='a')
-        fact.io.write_data(array_events, output_file, key='array_events', mode='a')
-        fact.io.write_data(telescope_events, output_file, key='telescope_events', mode='a')
+    if n_jobs > 1:
+        results = Parallel(n_jobs=n_jobs, verbose=5)(delayed(process_file)(f, n_events, silent=True) for f in input_files)
+        for r in results:
+            runs, array_events, telescope_events = r
+            fact.io.write_data(runs, output_file, key='runs', mode='a')
+            fact.io.write_data(array_events, output_file, key='array_events', mode='a')
+            fact.io.write_data(telescope_events, output_file, key='telescope_events', mode='a')
+    else:
+        for input_file in input_files:
+            print(f'processing file {input_file}')
+            runs, array_events, telescope_events = process_file(input_file, n_events)
+            fact.io.write_data(runs, output_file, key='runs', mode='a')
+            fact.io.write_data(array_events, output_file, key='array_events', mode='a')
+            fact.io.write_data(telescope_events, output_file, key='telescope_events', mode='a')
 
     verify_file(output_file)
 
 
-def process_file(input_file, n_events=-1):
+def process_file(input_file, n_events=-1, silent=False):
     event_source = EventSourceFactory.produce(
         input_url=input_file,
         max_events=n_events if n_events > 1 else None,
@@ -87,7 +97,7 @@ def process_file(input_file, n_events=-1):
 
     telescope_event_information = []
     array_event_information = []
-    for event in tqdm(event_source):
+    for event in tqdm(event_source, disable=silent):
         if number_of_valid_triggerd_cameras(event) < 2:
             continue
 
