@@ -19,7 +19,7 @@ import fact.io
 def main(input_files, output_file, n_workers):
     cluster = DRMAACluster()
     client = Client(cluster)
-    cluster.start_workers(n_workers)
+    cluster.start_workers(n_workers, nativeSpecification='-l walltime=01:59:59,vmem=6G')
 
     f = client.map(process_file, input_files)
     frames = client.gather(f)
