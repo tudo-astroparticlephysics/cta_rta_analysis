@@ -56,9 +56,6 @@ def main(
     protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
     gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
 
-    gammas['theta'] = calculate_distance_theta(gammas)
-    protons['theta'] = calculate_distance_theta(protons)
-
     sens, result_table = find_differential_sensitivity(protons, gammas, bin_edges=bin_edges, num_threads=n_jobs)
     if iterations > 1:
         sensitivities = []

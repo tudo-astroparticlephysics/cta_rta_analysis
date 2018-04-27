@@ -10,6 +10,7 @@ from joblib import delayed, Parallel
 from scipy import optimize
 from tqdm import tqdm
 from astropy.table import QTable
+import coordinates
 
 
 @u.quantity_input(t_obs=u.hour, t_ref=u.hour)
@@ -84,10 +85,18 @@ def calculate_sensitivity(
         signal_region=0.01,
         target_spectrum=CrabSpectrum()
 ):
+
+    if 'theta' not in gammas.columns:
+        gammas['theta'] = coordinates.calculate_distance_theta(gammas, source_az=0 * u.deg, source_alt = 70 * u.deg).to(u.deg).value
+
+    if 'theta' not in protons.columns:
+        protons['theta'] = coordinates.calculate_distance_theta(protons, source_az=0 * u.deg, source_alt = 70 * u.deg).to(u.deg).value
+
     selected_gammas = gammas.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
     selected_protons = protons.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
 
-    if len(selected_gammas) < 10 or len(selected_protons) < 10:
+    if len(selected_gammas) < 50 or len(selected_protons) < 10:
+        print(f'not enough events after prediction cut of {gamma_prediction_mean} and region cut of {signal_region}. selected_gammas = {len(selected_gammas)} selected_protons = {len(selected_protons)}')
         return np.inf / (u.erg * u.s * u.cm**2)
 
     n_on, n_off = get_on_and_off_counts(
@@ -95,7 +104,7 @@ def calculate_sensitivity(
         selected_gammas,
         signal_region_radius=signal_region
     )
-
+    # print(f'N_on = {n_on} N_off = {n_off}')
     relative_flux = relative_sensitivity(
         n_on,
         n_off,
@@ -121,15 +130,15 @@ def get_on_and_off_counts(selected_protons, selected_gammas, signal_region_radiu
     # to get a more stable estimate for n_off
     background_region_radius = signal_region_radius
 
-    b = np.nanpercentile(selected_protons.theta**2, 68)
-
-    if b == np.nan:
-        b = 10
+    # b = np.nanpercentile(selected_protons.theta**2, 68)
+    # print(b)
+    # if b == np.nan:
+    #     b = 10
 
 
     H, _ = np.histogram(
         selected_protons.theta**2,
-        bins=np.arange(0, b, background_region_radius),
+        bins=np.arange(0, 100, background_region_radius),
         weights=selected_protons.weight
     )
     n_off = H.mean()
@@ -147,6 +156,11 @@ def find_differential_sensitivity(
             num_threads=-1,
         ):
 
+    if 'theta' not in gammas.columns:
+        gammas['theta'] = coordinates.calculate_distance_theta(gammas, source_az=0 * u.deg, source_alt=70 * u.deg).to(u.deg).value
+
+    if 'theta' not in protons.columns:
+        protons['theta'] = coordinates.calculate_distance_theta(protons, source_az=0 * u.deg, source_alt=70 * u.deg).to(u.deg).value
 
     gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
     protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
@@ -182,15 +196,18 @@ def _optimizer_result_to_table(result):
 
 def _find_best_sensitivity_in_bin(g, p, bin):
 
+    print(f'bin{bin}:{len(g)} gammas and {len(p)} protons ')
+
     def f(x):
         return calculate_sensitivity(g, p, gamma_prediction_mean=x[0], signal_region=x[1]).value
 
     # ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.08, 0.001))
-    ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.31, 0.005))
+    ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.3, 0.0025))
     # Note: while it seems obviuous to use finish=optimize.fmin here. apparently it
     # tests invalid values. and then everything breaks. Negative theta cuts for
     # example
     res = optimize.brute(f, ranges, finish=None, full_output=True)
 
     cuts = res[0]
+    print(f'best result in bin {bin} is: {cuts}')
     return calculate_sensitivity(g, p, gamma_prediction_mean=cuts[0], signal_region=cuts[1]), cuts, bin

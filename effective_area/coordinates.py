@@ -1,6 +1,8 @@
 import astropy.units as u
 from astropy.coordinates import SkyCoord, Angle
 from astropy.coordinates import EarthLocation, Latitude, Longitude
+from astropy.coordinates.angle_utilities import angular_separation
+
 from astropy import wcs
 
 from dateutil import parser
@@ -57,14 +59,16 @@ def build_standard_wcs(image_center, shape, naxis=2, fov=9 * u.deg):
     return w
 
 
-def calculate_distance_theta(df):
-    alt = Angle(df.alt_prediction.values * u.rad).degree
-    mc_alt = Angle(df.mc_alt.values * u.rad).degree
+def calculate_distance_theta(df, source_alt=70 * u.deg, source_az=0 * u.deg):
+    source_az = Angle(source_az).wrap_at(180 * u.deg)
+    source_alt = Angle(source_alt)
 
-    az = Angle(df.az_prediction.values * u.rad).wrap_at(180 * u.deg).degree
-    mc_az = Angle(df.mc_az.values * u.rad).wrap_at(180 * u.deg).degree
+    az = Angle(df.az_prediction.values, unit=u.rad).wrap_at(180*u.deg)
+    alt = Angle(df.alt_prediction.values, unit=u.rad)
 
-    return np.sqrt((alt - mc_alt)**2 + (az - mc_az)**2)
+    distance = angular_separation(source_az, source_alt, az, alt)
+    return distance
+
 
 
 def wrap_angles(alt, az):
