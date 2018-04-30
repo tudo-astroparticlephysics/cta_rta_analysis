@@ -31,7 +31,7 @@ def split_on_off(gammas, protons, on_region_radius=0.32 * u.deg, off_region_radi
     on_gammas = select_points_in_circle(c_gamma, center, radius=on_region_radius)
     on_protons = select_points_in_circle(c_proton, center, radius=on_region_radius)
 
-    inner_ring_radius = 2 * on_region_radius
+    inner_ring_radius = 0.4 * u.deg
     off_gammas = select_points_in_ring(c_gamma, center, inner_radius=inner_ring_radius, outter_radius=off_region_radius)
     off_protons = select_points_in_ring(c_proton, center, inner_radius=inner_ring_radius, outter_radius=off_region_radius)
 

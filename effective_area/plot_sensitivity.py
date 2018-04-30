@@ -14,7 +14,7 @@ def plot_sensitivity(bin_edges, sensitivity, t_obs, sensitivity_std,  ax=None, s
     if not ax:
         ax = plt.gca()
 
-    bin_center = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    bin_center = np.sqrt(bin_edges[:-1]*bin_edges[1:])
     bin_width = np.diff(bin_edges)
 
     sensitivity = sensitivity.to(1 / (u.erg * u.s * u.cm**2))

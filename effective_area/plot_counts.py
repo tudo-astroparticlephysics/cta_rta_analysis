@@ -121,7 +121,7 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
 
 
         fig, ax = plt.subplots()
-        on, off = coordinates.split_on_off(gammas, protons)
+        on, off, _ = coordinates.split_on_off(gammas, protons)
         c = coordinates.skyccords_from_dl3_table(on).icrs
         ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal')
@@ -157,8 +157,18 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
         gammas = gammas.query(f'gamma_prediction_mean > {threshold}')
         protons = protons.query(f'gamma_prediction_mean > {threshold}')
 
+        plt.figure()
+        bins = np.linspace(0, 0.22, 40)
+        plt.hist(gammas['theta']**2, bins=bins, label='gamma', density=True, **kwargs)
+        plt.hist(protons['theta']**2, bins=bins, label='proton', density=True, **kwargs)
+        plt.legend()
+        plt.xlabel(r'$Distance Squared /  Degree^2$')
+        plt.ylabel(f'Normalized Counts t > {threshold}')
+        pdf.savefig()
+        plt.close()
+
         fig, ax = plt.subplots()
-        on, off = coordinates.split_on_off(gammas, protons)
+        on, off, _ = coordinates.split_on_off(gammas, protons)
         c = coordinates.skyccords_from_dl3_table(on).icrs
         ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal')

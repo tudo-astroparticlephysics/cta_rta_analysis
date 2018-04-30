@@ -34,28 +34,32 @@ def make_energy_bins(
 class Spectrum():
     '''
     A class containing usefull methods for working with power law spectra.
-    This class should be subclassed with real , physical, values for
-    the normalization constants. This class has a constant of 1 /(TeV m^2 h)
-    and and index of -1.0. Not very usefull by itself.
+    The  normalization_constant should a a unit like 1 /(TeV m^2 h)
+    and the index ( e.g. -2.0) should have not unit attached.
 
-    See the subclasses `~power_law.CosmicRaySpectrum` and `~power_law.CrabSpectrum`
-    for usefull physicall spectra.
+    See the subclasses `~models.CosmicRaySpectrum` and `~models.CrabSpectrum`
+    for usefull physical spectra.
+
+    Note that for now this only works for simple power laws.
     '''
 
-    index = -1
-    normalization_constant = 1 / (u.TeV * u.m**2 * u.h)
-    extended_source = False
 
-    def __init__(self, index=-1, normalization_constant = 1 / (u.TeV * u.m**2 * u.h)):
+    def __init__(self, index, normalization_constant):
         self.index = index
         self.normalization_constant = normalization_constant
+
+
+    @property
+    def extended_source(self):
+        return u.sr.si in [b.si for b in self.normalization_constant.unit.bases ]
 
 
     @u.quantity_input(e_min=u.TeV, e_max=u.TeV,)
     def draw_energy_distribution(self, e_min, e_max, size, index=None):
         '''
-        Draw random energies from a power_law spectrum.
+        Draw random energies from the spectrum.
         It is different from the scipy powerlaws because it supports negative indeces.
+
         Parameters
         ----------
         e_min:  Quantity
@@ -66,7 +70,7 @@ class Spectrum():
             number of random values to pick.
 
         Returns
-        ----------
+        -------
         An array of random numbers, with energy units (TeV) attached, of the given size.
         '''
         if not index:
@@ -123,7 +127,7 @@ class Spectrum():
             events = events * u.sr
 
         # at this point the value should have no units left
-        # assert events.si.unit.is_unity() == True
+        assert events.si.unit.is_unity() == True
         return events.si.value
 
 
@@ -141,7 +145,7 @@ class Spectrum():
         return N * (1 / (index + 1)) * (b**(index + 1) - a**(index + 1))
 
 
-    @u.quantity_input(e_min=u.TeV, e_max=u.TeV, area=u.m**2, t_obs=u.s)
+    @u.quantity_input(energy_bins=u.TeV, area=u.m**2, t_obs=u.s)
     def expected_events_for_bins(
             self,
             area,
@@ -197,7 +201,6 @@ class CosmicRaySpectrum(Spectrum):
     def __init__(self, index=-2.7, normalization_constant=9.6e-9 / (u.GeV * u.cm**2 * u.s * u.sr)):
         self.index = index
         self.normalization_constant = normalization_constant
-        self.extended_source = True
 
 
 class MCSpectrum(Spectrum):
@@ -229,7 +232,6 @@ class MCSpectrum(Spectrum):
     index = -2.0  # default for cta
     generator_solid_angle = None
     normalization_constant = 1 / (u.TeV * u.m**2 * u.s)
-    extended_source = False
 
     @u.quantity_input(e_min=u.TeV, e_max=u.TeV, generation_area=u.m**2)
     def __init__(
@@ -238,8 +240,8 @@ class MCSpectrum(Spectrum):
             e_max,
             total_showers_simulated,
             generation_area,
-            generator_solid_angle=None,  # default for CTA prod3
-            index=-2.0
+            generator_solid_angle=None,
+            index=-2.0  # default for CTA prod3
     ):
         '''
         To calculate the normalization constant of this spectrum some
@@ -260,15 +262,14 @@ class MCSpectrum(Spectrum):
             The solid angle over which the particles were created.
             This is necessary for extended sources like the cosmic ray spectrum
         '''
-        self.e_min = e_min
-        self.e_max = e_max
+        self.e_min = e_min.to('TeV')
+        self.e_max = e_max.to('TeV')
         self.total_showers_simulated = total_showers_simulated
         self.index = index
-        self.generation_area = generation_area
+        self.generation_area = generation_area.to('m^2')
         self.generator_solid_angle = generator_solid_angle
         self.normalization_constant = 1 / (u.TeV * u.m**2 * u.s)
         if generator_solid_angle is not None and generator_solid_angle > 0 * u.deg:
-            self.extended_source = True
             self.normalization_constant = 1 / (u.TeV * u.m**2 * u.s * u.sr)
             angle = generator_solid_angle.to('rad').value
             angle = (1 - np.cos(angle)) * 2 * np.pi * u.sr
@@ -279,6 +280,15 @@ class MCSpectrum(Spectrum):
         else:
             N = self._integral(e_min.to('TeV'), e_max.to('TeV')) * (generation_area.to(u.m**2) * u.s)
             self.normalization_constant = (total_showers_simulated / N) / (u.TeV * u.m**2 * u.s)
+
+
+    def draw_energy_distribution(self, size):
+        return super().draw_energy_distribution(
+            e_min=self.e_min,
+            e_max=self.e_max,
+            size=size,
+            index=self.index,
+        )
 
 
     def expected_events_for_bins(self, energy_bins):
@@ -316,7 +326,7 @@ class MCSpectrum(Spectrum):
         '''
         Get the spectrum object for the runs of a MC production.
 
-        TODO: For now this assumes all runs have the been simulated ith the same settings.
+        TODO: For now this assumes all runs have the been simulated with the same settings.
 
         Parameters
         ----------
@@ -367,28 +377,28 @@ class MCSpectrum(Spectrum):
         w = A * other_spectrum.flux(event_energies) / self.flux(event_energies)
 
         # at this point the value should have no units left
-        # assert w.si.unit.is_unity() == True
+        assert w.si.unit.is_unity() is True
         return w.value
-
-
-def trigger_efficency(simulated_energies, energy_bins):
-    from scipy import interpolate
-    p = [1.71e11, 0.0891, 1e5]
-
-    xx = energy_bins.to('MeV').value
-    efficency = p[0] * xx ** (-p[1]) * np.exp(-p[2] / xx)
-
-    efficency = efficency / efficency.max()
-    f = interpolate.interp1d(xx, efficency)
-    r = np.random.uniform(0, 1, simulated_energies.shape)
-
-    m = r > (1 - 0.5 * f(simulated_energies.to('MeV').value))
-    print(f'total trigger efficiency: {m.sum() / len(simulated_energies)}')
-    return m
 
 
 
 if __name__ == '__main__':
+
+    def trigger_efficency(simulated_energies, energy_bins):
+        from scipy import interpolate
+        p = [1.71e11, 0.0891, 1e5]
+
+        xx = energy_bins.to('MeV').value
+        efficency = p[0] * xx ** (-p[1]) * np.exp(-p[2] / xx)
+
+        efficency = efficency / efficency.max()
+        f = interpolate.interp1d(xx, efficency)
+        r = np.random.uniform(0, 1, simulated_energies.shape)
+
+        m = r > (1 - 0.5 * f(simulated_energies.to('MeV').value))
+        print(f'total trigger efficiency: {m.sum() / len(simulated_energies)}')
+        return m
+
     # executing this will create a plot which is usefull for checking if
     # the reweighing works correctly
     import matplotlib.pyplot as plt
@@ -407,10 +417,10 @@ if __name__ == '__main__':
         e_max=e_max,
         total_showers_simulated=N,
         generation_area=area,
+        index=simulation_index,
     )
 
-    random_energies = mc.draw_energy_distribution(
-        e_min, e_max, N, index=simulation_index)
+    random_energies = mc.draw_energy_distribution(N)
 
     crab = CrabSpectrum()
     events = crab.expected_events_for_bins(
