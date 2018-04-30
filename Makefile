@@ -64,7 +64,13 @@ gamma_test_lst = $(build_dir)/gammas_test_lst.hdf5
 proton_test_lst = $(build_dir)/protons_test_lst.hdf5
 
 
-all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_hists_diffuse) $(plot_roc_per_telescope) $(plot_roc_per_telescope_diffuse) $(plot_auc_vs_energy) $(plot_angular_resolution) $(plot_angular_resolution_diffuse) $(plot_ang_res_energy) $(plot_ang_res_energy_diffuse) $(plot_effective_area) $(plot_sensitivity_all) $(plot_sensitivity_sst) $(plot_sensitivity_lst) $(plot_sensitivity_mst)
+all: $(plot_overview) $(plot_overview_regressor) $(plot_roc) $(plot_hists) $(plot_roc_per_telescope) $(plot_auc_vs_energy) $(plot_angular_resolution)  $(plot_ang_res_energy)  $(plot_effective_area) $(plot_sensitivity_all)
+
+ml: $(plot_roc) $(plot_hists) $(plot_roc_per_telescope) $(plot_overview)  #$(plot_auc_vs_energy)
+
+sensitivity: $(plot_sensitivity_all)
+
+sensitivity_all: $(plot_sensitivity_all)  $(plot_sensitivity_sst) $(plot_sensitivity_lst) $(plot_sensitivity_mst)
 
 clean:
 	rm -rf $(build_dir)
@@ -98,9 +104,9 @@ $(model_regressor_diffuse) $(predictions): $(gamma_diffuse_train) $(config_regre
 
 
 $(build_dir)/APPLICATION_DONE: $(model_separator) $(config_separator) $(gamma_test) $(proton_test) $(model_regressor)
-	klaas_apply_separation_model $(config_separator) $(gamma_test) $(model_separator) --yes --chunksize 100000
-	klaas_apply_separation_model $(config_separator) $(proton_test) $(model_separator) --yes --chunksize 100000
-	klaas_apply_energy_regressor $(config_regressor) $(gamma_test) $(model_regressor) --yes --chunksize 100000
+	klaas_apply_separation_model $(config_separator) $(gamma_test) $(model_separator) --yes --chunksize 400000
+	klaas_apply_separation_model $(config_separator) $(proton_test) $(model_separator) --yes --chunksize 400000
+	# klaas_apply_energy_regressor $(config_regressor) $(gamma_test) $(model_regressor) --yes --chunksize 400000
 	touch $(build_dir)/APPLICATION_DONE
 
 
@@ -189,7 +195,7 @@ $(plot_sensitivity_lst): $(sensitivity_lst_fits)
 
 
 $(sensitivity_all_fits): $(gamma_test) $(proton_test)
-	python effective_area/calculate_sensitivity.py $(gamma_test) $(proton_test) $(sensitivity_all_fits) -n 20
+	python effective_area/calculate_sensitivity.py $(gamma_test) $(proton_test) $(sensitivity_all_fits) -n 10
 $(plot_sensitivity_all): $(sensitivity_all_fits)
 	python effective_area/plot_sensitivity.py   $(sensitivity_all_fits)  -o $(plot_sensitivity_all)
 
