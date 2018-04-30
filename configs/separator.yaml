@@ -8,7 +8,10 @@ classifier : |
   )
 
 
-n_cross_validations : 10
+n_signal: 50000
+n_background: 50000
+
+n_cross_validations : 5
 
 telescope_type_key: telescope_type_name
 telescope_events_key: telescope_events
@@ -16,6 +19,8 @@ array_events_key: array_events
 runs_key: runs
 
 multiple_telescopes: True
+
+calibrate_classifier: True
 
 training_variables:
   - num_triggered_telescopes
