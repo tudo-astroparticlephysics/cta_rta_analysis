@@ -5,7 +5,7 @@ from coordinates import calculate_distance_theta
 import fact.io
 import pandas as pd
 import numpy as np
-from sensitivity import find_differential_sensitivity
+from sensitivity import optimize_differential_sensitivity, calculate_differential_sensitivity
 
 
 @click.command()
@@ -53,19 +53,18 @@ def main(
     gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
     protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
 
-    protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
-    gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
 
-    sens, result_table = find_differential_sensitivity(protons, gammas, bin_edges=bin_edges, num_threads=n_jobs)
-    if iterations > 1:
-        sensitivities = []
-        for i in range(iterations):
-            g = gammas.sample(frac=0.5)
-            p = protons.sample(frac=0.5)
-            sensitivity, _ = find_differential_sensitivity(p, g, bin_edges=bin_edges, num_threads=n_jobs)
-            sensitivities.append(sensitivity)
-
-        result_table['flux_std'] = np.array([s for s in sensitivities]).std(axis=0) * sensitivity.unit
+    result_table = calculate_differential_sensitivity(gammas, protons,  bin_edges=bin_edges)
+    # sens, result_table = find_differential_sensitivity(protons, gammas, bin_edges=bin_edges, num_threads=n_jobs)
+    # if iterations > 1:
+    #     sensitivities = []
+    #     for i in range(iterations):
+    #         g = gammas.sample(frac=0.5)
+    #         p = protons.sample(frac=0.5)
+    #         sensitivity, _ = find_differential_sensitivity(p, g, bin_edges=bin_edges, num_threads=n_jobs)
+    #         sensitivities.append(sensitivity)
+    #
+    #     result_table['flux_std'] = np.array([s for s in sensitivities]).std(axis=0) * sensitivity.unit
 
     result_table.write(output, overwrite=True)
 

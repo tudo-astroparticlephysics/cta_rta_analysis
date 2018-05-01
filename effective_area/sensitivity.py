@@ -1,14 +1,13 @@
 from scipy.optimize import minimize_scalar
 from fact.analysis import li_ma_significance
 import astropy.units as u
-from astropy.table import Table
 import numpy as np
 import pandas as pd
 from spectrum import CrabSpectrum
 import multiprocessing
 from scipy import optimize
 from tqdm import tqdm
-from astropy.table import QTable
+from astropy.table import QTable, Table
 import coordinates
 from itertools import starmap, zip_longest
 
@@ -59,16 +58,20 @@ def relative_sensitivity(
         The Astrophysical Journal 272 (1983): 317-324.
         Formula (17)
     '''
+    if np.isnan(n_on) or np.isnan(n_off):
+        return np.nan
+
+    if n_off * alpha > n_on:
+        return np.nan
 
     n_background = n_off * alpha
     n_signal = n_on - n_background
 
-    if np.isnan(n_on) or np.isnan(n_off):
-        return np.nan
+
 
     def equation(relative_flux):
-        n_on = n_signal * relative_flux + n_background
-        s = significance_function(n_on, n_off, alpha) - target_significance
+        n_on_scaled = n_signal * relative_flux + n_background
+        s = significance_function(n_on_scaled, n_background, alpha=1) - target_significance
         # print(n_on, n_off, relative_flux, s, significance_function(n_on, n_off, alpha))
         return s
     try:
@@ -163,7 +166,7 @@ def calculate_sensitivity(
         protons,
         min_energy,
         max_energy,
-        gamma_prediction_mean=0.5,
+        gamma_prediction_cut=0.5,
         signal_region=0.01,
         target_spectrum=CrabSpectrum()
 ):
@@ -174,13 +177,13 @@ def calculate_sensitivity(
     if 'theta' not in protons.columns:
         protons['theta'] = coordinates.calculate_distance_theta(protons, source_az=0 * u.deg, source_alt = 70 * u.deg).to(u.deg).value
 
-    selected_gammas = gammas.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
-    selected_protons = protons.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
+    selected_gammas = gammas.query(f'gamma_prediction_mean >={gamma_prediction_cut}').copy()
+    selected_protons = protons.query(f'gamma_prediction_mean >={gamma_prediction_cut}').copy()
     # print(selected_gammas.shape)
     # print(selected_protons.shape)
 
-    if len(selected_protons) < 50 or len(selected_gammas) < 50:
-        return np.inf / (u.erg * u.s * u.cm**2)
+    # if len(selected_protons) < 50 or len(selected_gammas) < 50:
+    #     return np.inf / (u.erg * u.s * u.cm**2)
 
     # on, off, alpha = coordinates.split_on_off(
     #     selected_protons,
@@ -192,14 +195,14 @@ def calculate_sensitivity(
     # n_on = on.weight.sum()
 
     n_on, n_off = get_on_and_off_counts(
-        selected_protons,
         selected_gammas,
+        selected_protons,
         on_region_radius=signal_region
     )
     alpha = 1
-    if (n_off * alpha + 10 > n_on):
-        return np.inf / (u.erg * u.s * u.cm**2)
-    # print(f'N_on = {n_on} N_off = {n_off}')
+    # if (n_off * alpha + 10 > n_on):
+    #     return np.inf / (u.erg * u.s * u.cm**2)
+    print(f'N_on = {n_on} N_off = {n_off}')
     relative_flux = relative_sensitivity(
         n_on,
         n_off,
@@ -214,28 +217,59 @@ def calculate_sensitivity(
     return sens
 
 
-def get_on_and_off_counts(selected_protons, selected_gammas, on_region_radius):
+def get_on_and_off_counts(selected_gammas, selected_protons, on_region_radius):
     """ Get on and off counts from the signal region using a simpel theta**2 cut"""
 
     # estimate n_off by assuming that the background rate is constant within a
     # smallish theta area around 0. take the mean of the theta square histogram
     # to get a more stable estimate for n_off
-
-    theta_square_cut = on_region_radius**2
-
-    H, _ = np.histogram(
-        selected_protons.theta**2,
-        bins=np.arange(0, 0.6, theta_square_cut),
-        weights=selected_protons.weight
-    )
-    n_off = H.mean()
-
-    n_on = n_off + selected_gammas.query(f'theta**2 < {theta_square_cut}')['weight'].sum()
-    # print(n_on, n_off)
+    #
+    # theta_square_cut = on_region_radius.to(u.deg).value**2
+    #
+    # H, _ = np.histogram(
+    #     selected_protons.theta**2,
+    #     bins=np.arange(0, 0.6, theta_square_cut),
+    #     weights=selected_protons.weight
+    # )
+    # n_off = H.mean()
+    n_off = selected_protons.query(f'theta < {on_region_radius.to(u.deg).value}')['weight'].sum()
+    n_on = n_off + selected_gammas.query(f'theta < {on_region_radius.to(u.deg).value}')['weight'].sum()
     return n_on, n_off
 
 
-def find_differential_sensitivity(
+def calculate_differential_sensitivity(
+            gammas,
+            protons,
+            bin_edges,
+            gamma_prediction_cut = 0.7,
+            signal_region_radius = 0.25 * u.deg,
+            target_spectrum=CrabSpectrum(),
+):
+    if 'theta' not in gammas.columns:
+        gammas['theta'] = coordinates.calculate_distance_theta(gammas, source_az=0 * u.deg, source_alt=70 * u.deg).to(u.deg).value
+
+    if 'theta' not in protons.columns:
+        protons['theta'] = coordinates.calculate_distance_theta(protons, source_az=0 * u.deg, source_alt=70 * u.deg).to(u.deg).value
+
+    gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
+    protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
+
+    rows = []
+    for (bin, g,), ( _, p) in zip(gammas.groupby('energy_bin'), protons.groupby('energy_bin')):
+        flux  = calculate_sensitivity(g, p, bin.left, bin.right, gamma_prediction_cut=gamma_prediction_cut, signal_region=signal_region_radius)
+
+        d  = {'left_edge': bin.left, 'right_edge': bin.right, 'flux': flux.to(1 / (u.m**2 * u.s * u.TeV)).value}
+        rows.append(d)
+
+    t = Table(rows)
+    t['flux'] = t['flux'] / (u.m**2 * u.s * u.TeV)
+    t['radius'] = signal_region_radius
+    t['threshold'] = gamma_prediction_cut
+    t['left_edge'] = t['left_edge'] * u.TeV
+    t['right_edge'] = t['right_edge'] * u.TeV
+    return t
+
+def optimize_differential_sensitivity(
             protons,
             gammas,
             bin_edges,
@@ -286,7 +320,7 @@ def _find_best_sensitivity_in_bin(g, p, bin):
         return calculate_sensitivity(g, p, min_energy, max_energy, gamma_prediction_mean=x[0], signal_region=x[1]).value
 
     # ranges = (slice(0.0, 1, 0.025), slice(0.001, 0.08, 0.001))
-    ranges = (slice(0.0, 1, 0.05), slice(0.01, 0.3, 0.025))
+    ranges = (slice(0.0, 1, 0.05))
     # Note: while it seems obviuous to use finish=optimize.fmin here. apparently it
     # tests invalid values. and then everything breaks. Negative theta cuts for
     # example

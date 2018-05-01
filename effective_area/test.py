@@ -22,7 +22,6 @@ def plot_sensitivity(bin_edges, sensitivity, t_obs, ax=None, scale=True, **kwarg
         _, ax = plt.subplots(1)
 
     bin_center = np.sqrt(bin_edges[:-1] * bin_edges[1:])
-    bin_width = np.diff(bin_edges)
     xerr = [np.abs(bin_edges[:-1] - bin_center).value, np.abs(bin_edges[1:] - bin_center).value]
 
 
@@ -91,7 +90,7 @@ def calculate_sensitivity(
     selected_gammas = gammas.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
     selected_protons = protons.query(f'gamma_prediction_mean >={gamma_prediction_mean}').copy()
 
-    if len(selected_gammas) < 10 or len(selected_protons) < 10:
+    if len(selected_gammas) < 100 or len(selected_protons) < 100:
         return np.inf/(u.erg * u.s * u.cm**2)
 
     n_on, n_off = get_on_and_off_counts(
@@ -119,32 +118,46 @@ def calculate_sensitivity(
     return sens
 
 
+def distance(df):
+    return np.sqrt((70 - np.rad2deg(df.alt_prediction))**2 + (0 - np.rad2deg(df.az_prediction))**2)
+
+
 def get_on_and_off_counts(selected_protons, selected_gammas, signal_region_radius):
     """ Get on and off counts from the signal region using a simepl theta**2 cut"""
 
     # estimate n_off by assuming that the background rate is constant within a
     # smallish theta area around 0. take the mean of the thata square histogram
     # to get a more stable estimate for n_off
-    background_region_radius = signal_region_radius
+    background_region_radius = 2
+
+    alpha = (signal_region_radius**2) / (background_region_radius**2)
     # # print(selected_protons.theta.count(), selected_protons.weight.count())
     # if selected_protons.weight.count() == 30:
     #     print(selected_protons.weight)
     #b = np.nanpercentile(selected_protons.theta**2, 68)
 
     #if b == np.nan:
-    b = 10
+    # b = 5
+    #
+    #
 
+    # from IPython import embed; embed()
+    # print(np.arange(0, background_region_radius, signal_region_radius))
+    # print(H, H.mean(), alpha)
+
+    #from IPython import embed; embed()
+    selected_protons['theta'] = distance(selected_protons)
+    selected_gammas['theta'] = distance(selected_gammas)
 
     H, _ = np.histogram(
         selected_protons.theta**2,
-        bins=np.arange(0, b, background_region_radius),
+        bins=np.arange(0, background_region_radius**2, signal_region_radius**2),
         weights=selected_protons.weight
     )
+    n_off = selected_protons.query(f'theta < {background_region_radius}')['weight'].sum() * alpha
+    print(H, H.mean(),   n_off)
 
-    #from IPython import embed; embed()
-    n_off = H.mean()
-
-    n_on = selected_gammas.query(f'theta**2 < {signal_region_radius}')['weight'].sum()
+    n_on = selected_gammas.query(f'theta < {signal_region_radius}')['weight'].sum()
 
     return n_on, n_off
 
@@ -188,7 +201,7 @@ def find_best_sensitivity_in_bin(g, p, energy_bin):
     def f(x):
         return calculate_sensitivity(g, p, min_energy=energy_bin.left, max_energy=energy_bin.right, gamma_prediction_mean=x[0], signal_region=x[1]).value
 
-    ranges = (slice(0.0, 1, 0.1), slice(0.001, 0.08, 0.0025))
+    ranges = (slice(0.0, 1, 0.1), slice(0.001, 0.1, 0.025))
     # Note: while it seems obviuous to use finish=optimize.fmin here. apparently it
     # tests invalid values. and then everything breaks. Negative theta cuts for
     # example
@@ -244,7 +257,8 @@ def main(
 
     gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
     protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
-
+    # gammas['weight'] = 1
+    # protons['weight'] = 1
     # protons['energy_bin'] = pd.cut(protons.mc_energy, bin_edges)
     # gammas['energy_bin'] = pd.cut(gammas.mc_energy, bin_edges)
 

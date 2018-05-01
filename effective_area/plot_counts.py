@@ -7,6 +7,7 @@ from spectrum import make_energy_bins
 from astropy.coordinates import Angle, SkyCoord
 from regions import CircleSkyRegion
 import numpy as np
+from spectrum import CosmicRaySpectrum, CrabSpectrum, MCSpectrum
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -33,10 +34,22 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
     print(f'Reading {len(gammas)} gammas')
     gammas = gammas.dropna()
 
-
     protons = fact.io.read_data(protons_dl3, key='array_events')
     print(f'Reading {len(protons)} protons')
     protons = protons.dropna()
+
+    gamma_runs = fact.io.read_data(gammas_dl3, key='runs')
+    mc_production_gamma = MCSpectrum.from_cta_runs(gamma_runs)
+
+    proton_runs = fact.io.read_data(protons_dl3, key='runs')
+    mc_production_proton = MCSpectrum.from_cta_runs(proton_runs)
+
+    crab = CrabSpectrum()
+    cosmic = CosmicRaySpectrum()
+    t_obs = 60*u.s
+    gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
+    protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
+
     with PdfPages(output_pdf) as pdf:
 
         plt.figure()
@@ -76,12 +89,34 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
         plt.close()
 
         plt.figure()
-        bins = np.linspace(0, 0.22, 40)
+        bins = np.linspace(0, 0.30, 40)
         plt.hist(gammas['theta']**2, bins=bins, label='gamma', density=True, **kwargs)
         plt.hist(protons['theta']**2, bins=bins, label='proton', density=True, **kwargs)
         plt.legend()
         plt.xlabel(r'$Distance Squared /  Degree^2$')
         plt.ylabel('Normalized Counts')
+        pdf.savefig()
+        plt.close()
+
+        plt.figure()
+        bins = np.linspace(0, 0.30, 40)
+        on = gammas.append(protons)
+        plt.hist(gammas['theta']**2, bins=bins, label='gammas', weights=gammas.weight, **kwargs)
+        plt.hist(protons['theta']**2, bins=bins, label='proton', weights=protons.weight, **kwargs)
+        plt.legend()
+        plt.xlabel(r'$Distance Squared /  Degree^2$')
+        plt.ylabel('weighted Counts')
+        pdf.savefig()
+        plt.close()
+
+        plt.figure()
+        bins = np.linspace(0, 0.30, 40)
+        on = gammas.append(protons)
+        plt.hist(on['theta']**2, bins=bins, label='on (gammas + protons)', weights=on.weight, **kwargs)
+        plt.hist(protons['theta']**2, bins=bins, label='proton', weights=protons.weight, **kwargs)
+        plt.legend()
+        plt.xlabel(r'$Distance Squared /  Degree^2$')
+        plt.ylabel('weighted Counts')
         pdf.savefig()
         plt.close()
 
@@ -94,8 +129,9 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
         ra_bins = np.linspace(11, 17, 50)
         dec_bins = np.linspace(41, 47, 50)
 
-        ax.hist2d(ra, dec, bins=[ra_bins, dec_bins], cmap='magma')
+        _, _, _, im = ax.hist2d(ra, dec, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal',)
+        plt.colorbar(im, ax=ax)
         plt.title('gammas')
         plt.xlabel(r'$Right Ascension /  Degree$')
         plt.ylabel(r'$Declination /  Degree$')
@@ -110,9 +146,10 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
         ra = c.ra.deg
         dec = c.dec.deg
 
-        ax.hist2d(ra, dec, bins=[ra_bins, dec_bins], cmap='magma')
+        _, _, _, im = ax.hist2d(ra, dec, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal')
         plt.title('protons')
+        plt.colorbar(im, ax=ax)
         plt.xlabel(r'$Right Ascension /  Degree$')
         plt.ylabel(r'$Declination /  Degree$')
         pdf.savefig()
@@ -123,17 +160,19 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
         fig, ax = plt.subplots()
         on, off, _ = coordinates.split_on_off(gammas, protons)
         c = coordinates.skyccords_from_dl3_table(on).icrs
-        ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
+        _, _, _, im = ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal')
         plt.title('on region')
+        plt.colorbar(im, ax=ax)
         pdf.savefig()
         plt.close()
 
 
         fig, ax = plt.subplots()
         c = coordinates.skyccords_from_dl3_table(off).icrs
-        ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
+        _, _, _, im = ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal')
+        plt.colorbar(im, ax=ax)
         plt.title('off region')
         pdf.savefig()
         plt.close()
@@ -170,8 +209,9 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
         fig, ax = plt.subplots()
         on, off, _ = coordinates.split_on_off(gammas, protons)
         c = coordinates.skyccords_from_dl3_table(on).icrs
-        ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
+        _, _, _, im = ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal')
+        plt.colorbar(im, ax=ax)
         plt.title(f'{len(on)} gammalike events in on region threshold={threshold}')
         pdf.savefig()
         plt.close()
@@ -179,8 +219,9 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
 
         fig, ax = plt.subplots()
         c = coordinates.skyccords_from_dl3_table(off).icrs
-        ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
+        _, _, _, im = ax.hist2d(c.ra.deg, c.dec.deg, bins=[ra_bins, dec_bins], cmap='magma')
         ax.set_aspect('equal')
+        plt.colorbar(im, ax=ax)
         plt.title(f'{len(off)} gammalike events in off region threshold={threshold}')
         pdf.savefig()
         plt.close()
