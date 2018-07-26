@@ -1,0 +1,23 @@
+# seed for the random number generators, to make things reproducible
+seed: 0
+
+
+# telescope_type_key: telescope_type_name
+telescope_events_key: telescope_events
+array_events_key: array_events
+runs_key: runs
+
+
+multiple_telescopes: True
+
+
+selection:
+    telescope_type_name:
+      - '=='
+      - 'MST'
+    length:
+      - '>'
+      - 0.02
+    width:
+      - '>'
+      - 0.01

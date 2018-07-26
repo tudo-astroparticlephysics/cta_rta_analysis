@@ -5,6 +5,7 @@ from astropy.stats import binom_conf_interval
 import fact.io
 from spectrum import MCSpectrum, make_energy_bins
 import astropy.units as u
+import pandas as pd
 
 
 @click.command()
@@ -14,7 +15,8 @@ import astropy.units as u
 @click.option('-o', '--output', type=click.Path(exists=False))
 @click.option('-b', '--n_bins', default=20, show_default=True)
 @click.option('-t', '--threshold', default=0.0, show_default=True, help='prediction threshold to apply')
-def main(gamma_input, label, color, output, n_bins, threshold):
+@click.option('--reference/--no-reference', default=True)
+def main(gamma_input, label, color, output, n_bins, threshold, reference):
 
     if label and len(gamma_input) != len(label):
         print('Must pass as many labels as gamma files as proton files')
@@ -72,7 +74,13 @@ def main(gamma_input, label, color, output, n_bins, threshold):
         )
 
 
-    plt.ylim([10, 10E7])
+    if reference:
+        path = 'resources/ascii/CTA-Performance-prod3b-v1-South-20deg-50h-EffAreaNoDirectionCut.txt'
+        df = pd.read_csv(path, delimiter='\t\t', skiprows=11, names=['energy', 'effective_area'], engine='python')
+        plt.plot(df.energy, df.effective_area, '--', color='gray')
+
+
+    plt.ylim([10, 10E8])
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel(r'$E_{\mathrm{True}} /  \mathrm{TeV}$')

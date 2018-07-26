@@ -30,13 +30,18 @@ def calculate_distance(df):
 @click.option('-b', '--bins', default=10, show_default=True)
 @click.option('-t', '--threshold', default=0.5, show_default=True, help='prediction threshold')
 def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
+    cols = ['az_prediction', 'alt_prediction', 'mc_energy']
+
+
     gammas = fact.io.read_data(gammas_dl3, key='array_events')
     print(f'Reading {len(gammas)} gammas')
-    gammas = gammas.dropna()
+    # import IPython; IPython.embed()
+
+    gammas = gammas.dropna(subset=cols)
 
     protons = fact.io.read_data(protons_dl3, key='array_events')
     print(f'Reading {len(protons)} protons')
-    protons = protons.dropna()
+    protons = protons.dropna(subset=cols)
 
     gamma_runs = fact.io.read_data(gammas_dl3, key='runs')
     mc_production_gamma = MCSpectrum.from_cta_runs(gamma_runs)
@@ -46,7 +51,7 @@ def main(gammas_dl3, protons_dl3, output_pdf, bins, threshold):
 
     crab = CrabSpectrum()
     cosmic = CosmicRaySpectrum()
-    t_obs = 60*u.s
+    t_obs = 60 * u.s
     gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
     protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
 

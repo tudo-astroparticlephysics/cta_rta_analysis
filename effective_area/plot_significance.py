@@ -1,5 +1,4 @@
 import click
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import astropy.units as u
@@ -10,34 +9,32 @@ from fact.analysis import li_ma_significance
 
 
 @click.command()
-@click.argument('gammas_dl3', type=click.Path(exists=True))
-@click.argument('protons_dl3', type=click.Path(exists=True))
+@click.argument('gammas', type=click.Path(exists=True))
+@click.argument('protons', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(exists=False))
-def main(gammas_dl3, protons_dl3, output):
+def main(gammas, protons, output):
 
-    t_obs = 0.5 * u.h
-    # cut = 0.0
+    t_obs = 50 * u.h
 
-    gammas = fact.io.read_data(gammas_dl3, key='array_events')
+    gammas = fact.io.read_data(gammas, key='array_events')
     gammas = gammas.dropna()
 
 
-    gamma_runs = fact.io.read_data(gammas_dl3, key='runs')
+    gamma_runs = fact.io.read_data(gammas, key='runs')
     mc_production_gamma = MCSpectrum.from_cta_runs(gamma_runs)
 
-    protons = fact.io.read_data(protons_dl3, key='array_events')
+    protons = fact.io.read_data(protons, key='array_events')
     protons = protons.dropna()
 
     # print(f'Plotting {len(protons)} protons and {len(gammas)} gammas.')
-    proton_runs = fact.io.read_data(protons_dl3, key='runs')
+    proton_runs = fact.io.read_data(protons, key='runs')
     mc_production_proton = MCSpectrum.from_cta_runs(proton_runs)
 
 
     crab = CrabSpectrum()
     cosmic = CosmicRaySpectrum()
 
-    import IPython; IPython.embed()
-    
+
     gammas['weight'] = mc_production_gamma.reweigh_to_other_spectrum(crab, gammas.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
     protons['weight'] = mc_production_proton.reweigh_to_other_spectrum(cosmic, protons.mc_energy.values * u.TeV, t_assumed_obs=t_obs)
 

@@ -66,7 +66,7 @@ def calculate_distance_theta(df, source_alt=70 * u.deg, source_az=0 * u.deg):
     az = Angle(df.az_prediction.values, unit=u.rad).wrap_at(180*u.deg)
     alt = Angle(df.alt_prediction.values, unit=u.rad)
 
-    distance = angular_separation(source_az, source_alt, az, alt)
+    distance = angular_separation(source_az, source_alt, az, alt).to(u.deg)
     return distance
 
 
