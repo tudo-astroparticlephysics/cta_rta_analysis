@@ -50,14 +50,17 @@ energy:
     - skewness
     - kurtosis
     - intensity
-    - camera_id
+    - camera_type_id
     - telescope_type_id
     - total_intensity
+    - average_intensity
     # - h_max_prediction
-    - distance_to_core
+    - distance_to_reconstructed_core_position
     - num_triggered_lst
     - num_triggered_mst
     - num_triggered_sst
+    - mirror_area
+    - focal_length
     - r
 
   feature_generation:
@@ -105,14 +108,17 @@ separator:
     - skewness
     - kurtosis
     - intensity
-    - camera_id
+    - camera_type_id
     - telescope_type_id
     - total_intensity
+    - average_intensity
     # - h_max_prediction
-    - distance_to_core
+    - distance_to_reconstructed_core_position
     - num_triggered_lst
     - num_triggered_mst
     - num_triggered_sst
+    - mirror_area
+    - focal_length
     # - psi
     # - phi
     # - r
