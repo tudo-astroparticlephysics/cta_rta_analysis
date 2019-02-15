@@ -11,29 +11,22 @@ runs_key: runs
 multiple_telescopes: True
 
 
-# selection:
-#     length:
-#       - '>'
-#       - 0.02
-#     width:
-#       - '>'
-#       - 0.01
-
 # config for the energy regression
 energy:
   regressor : |
     ensemble.RandomForestRegressor(
-      n_estimators=150,
+      n_estimators=100,
       max_features='sqrt',
       n_jobs=-1,
       max_depth=12,
     )
 
+  log_target: True
 
   target_column: mc_energy
 
   # define the number of cross validations to perform
-  n_cross_validations : 3
+  n_cross_validations : 5
 
   # Define the name of the category you want to find. The default is 'gamma_energy'.
   # It will be written as <class_name>_prediction into the file when applying the model.
@@ -54,14 +47,14 @@ energy:
     - telescope_type_id
     - total_intensity
     - average_intensity
-    # - h_max_prediction
+    - h_max
     - distance_to_reconstructed_core_position
     - num_triggered_lst
     - num_triggered_mst
     - num_triggered_sst
     - mirror_area
     - focal_length
-    - r
+
 
   feature_generation:
     needed_columns:
@@ -79,10 +72,10 @@ energy:
 separator:
   classifier : |
     ensemble.RandomForestClassifier(
-        n_estimators=150,
+        n_estimators=100,
         max_features='sqrt',
         n_jobs=-1,
-        max_depth=15,
+        max_depth=12,
         criterion='entropy',
     )
 
@@ -90,7 +83,7 @@ separator:
   # n_signal: 100000
   #n_background: 100000
 
-  n_cross_validations : 3
+  n_cross_validations : 5
 
   # telescope_type_key: telescope_type_name
   # telescope_events_key: telescope_events
@@ -112,16 +105,14 @@ separator:
     - telescope_type_id
     - total_intensity
     - average_intensity
-    # - h_max_prediction
+    - h_max
     - distance_to_reconstructed_core_position
     - num_triggered_lst
     - num_triggered_mst
     - num_triggered_sst
     - mirror_area
     - focal_length
-    # - psi
-    # - phi
-    # - r
+
 
   feature_generation:
     needed_columns:

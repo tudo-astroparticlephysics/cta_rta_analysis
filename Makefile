@@ -50,18 +50,18 @@ clean:
 $(build_dir):
 	mkdir -p $(build_dir)
 
-$(proton_test) $(proton_train): $(data_dir)/proton.h5 | $(build_dir)
+$(proton_test) $(proton_train): $(data_dir)/protons.h5 | $(build_dir)
 	# aict_apply_cuts $(config) $(data_dir)/dl2/protons.hdf5 $(build_dir)/protons_cutted.hdf5 -k telescope_events
-	aict_split_data $(data_dir)/proton.h5 $(build_dir)/proton -n test -f 0.5 -n train -f 0.5  -t cta --format 'tables'
-$(gamma_test) $(gamma_train): $(data_dir)/gamma_diffuse.h5 | $(build_dir)
+	aict_split_data $(data_dir)/protons.h5 $(build_dir)/proton -n train -f 0.015 -n test -f 0.985  -t cta --format 'tables'
+$(gamma_test) $(gamma_train): $(data_dir)/gammas_diffuse.h5 | $(build_dir)
 	# aict_apply_cuts $(config) $(data_dir)/dl2/gammas.hdf5 $(build_dir)/gammas_cutted.hdf5 -k telescope_events
-	aict_split_data $(data_dir)/gamma_diffuse.h5 $(build_dir)/gamma -n test -f 0.5 -n train -f 0.5  -t cta --format 'tables'
+	aict_split_data $(data_dir)/gammas_diffuse.h5 $(build_dir)/gamma -n train -f 0.1 -n test -f 0.9  -t cta --format 'tables'
 $(electron_test): | $(build_dir)
 	# aict_apply_cuts $(config) $(data_dir)/dl2/gammas.hdf5 $(build_dir)/gammas_cutted.hdf5 -k telescope_events
-	cp $(data_dir)/electron.h5 $(electron_test)
+	cp $(data_dir)/electrons.h5 $(electron_test)
 $(gamma_pointlike): | $(build_dir)
 	# aict_apply_cuts $(config) $(data_dir)/dl2/gammas.hdf5 $(build_dir)/gammas_cutted.hdf5 -k telescope_events
-	cp $(data_dir)/gamma_pointlike.h5 $(gamma_pointlike)
+	cp $(data_dir)/gammas.h5 $(gamma_pointlike)
 
 
 $(model_separator) $(predictions_separator): $(proton_train) $(gamma_train) $(config)
@@ -72,14 +72,14 @@ $(model_regressor) $(predictions_regressor): $(gamma_train) $(config)
 #
 
 $(build_dir)/APPLICATION_DONE: $(model_separator) $(config) $(gamma_test) $(proton_test) $(model_regressor) $(electron_test) $(gamma_pointlike)
-	aict_apply_separation_model $(config) $(gamma_test) $(model_separator) --yes --chunksize 40000
-	aict_apply_separation_model $(config) $(proton_test) $(model_separator) --yes --chunksize 40000
-	aict_apply_separation_model $(config) $(electron_test) $(model_separator) --yes --chunksize 40000
-	aict_apply_separation_model $(config) $(gamma_pointlike) $(model_separator) --yes --chunksize 40000
-	aict_apply_energy_regressor $(config) $(gamma_test) $(model_regressor) --yes --chunksize 40000
-	aict_apply_energy_regressor $(config) $(proton_test) $(model_regressor) --yes --chunksize 40000
-	aict_apply_energy_regressor $(config) $(electron_test) $(model_regressor) --yes --chunksize 40000
-	aict_apply_energy_regressor $(config) $(gamma_pointlike) $(model_regressor) --yes --chunksize 40000
+	aict_apply_separation_model $(config) $(gamma_test) $(model_separator) --yes --chunksize 400000
+	aict_apply_separation_model $(config) $(proton_test) $(model_separator) --yes --chunksize 400000
+	aict_apply_separation_model $(config) $(electron_test) $(model_separator) --yes --chunksize 400000
+	aict_apply_separation_model $(config) $(gamma_pointlike) $(model_separator) --yes --chunksize 400000
+	aict_apply_energy_regressor $(config) $(gamma_test) $(model_regressor) --yes --chunksize 400000
+	aict_apply_energy_regressor $(config) $(proton_test) $(model_regressor) --yes --chunksize 400000
+	aict_apply_energy_regressor $(config) $(electron_test) $(model_regressor) --yes --chunksize 400000
+	aict_apply_energy_regressor $(config) $(gamma_pointlike) $(model_regressor) --yes --chunksize 400000
 	touch $(build_dir)/APPLICATION_DONE
 
 
@@ -90,8 +90,8 @@ $(plot_overview): $(model_separator) $(predictions_separator) matplotlibrc $(con
 $(plot_overview_regressor): $(model_regressor) $(predictions_regressor) matplotlibrc $(config)
 	aict_plot_regressor_performance $(config) $(predictions_regressor) $(model_regressor) -o $(plot_overview_regressor)
 
-$(plot_effective_area): $(gamma_test)
-	cta_plot_effective_area $(gamma_test) -o $(plot_effective_area) -t 0 -t 0.7
+$(plot_effective_area): $(gamma_pointlike)
+	cta_plot_effective_area $(gamma_pointlike) -o $(plot_effective_area) -t 0 -t 0.7
 
 $(plot_angular_resolution): $(gamma_test)
 	cta_plot_angular_resolution $(gamma_test) -o $(plot_angular_resolution) -m 3 --reference --plot_e_reco
@@ -100,8 +100,8 @@ $(plot_angular_resolution_pointlike): $(gamma_pointlike)
 	cta_plot_angular_resolution $(gamma_pointlike) -o $(plot_angular_resolution_pointlike) -m 3 --reference --plot_e_reco
 
 
-$(sensitivity): $(gamma_pointlike) $(proton_test) | $(build_dir)
-	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) -o $(sensitivity) --reference --requirement
+$(sensitivity): $(gamma_pointlike) $(proton_test) $(build_dir)/APPLICATION_DONE | $(build_dir)
+	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) -o $(sensitivity) --reference --requirement -m 5
 # $(sensitivity_sst_fits): $(gamma_test_sst) $(proton_test_sst)
 # 	python effective_area/calculate_sensitivity.py $(gamma_test_sst) $(proton_test_sst) $(sensitivity_sst_fits) -n 20
 # $(plot_sensitivity_sst): $(sensitivity_sst_fits)
