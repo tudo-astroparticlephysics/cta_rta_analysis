@@ -6,12 +6,13 @@ plot_overview = $(build_dir)/separator_performance.pdf
 plot_overview = $(build_dir)/separator_performance.pdf
 plot_overview_diffuse = $(build_dir)/separator_performance_diffuse.pdf
 plot_overview_regressor = $(build_dir)/regressor_performance.pdf
+
+plot_effective_area_pointlike = $(build_dir)/effective_area_pointlike.pdf
 plot_effective_area = $(build_dir)/effective_area.pdf
+
 plot_angular_resolution = $(build_dir)/angular_resolution.pdf
 plot_angular_resolution_pointlike = $(build_dir)/angular_resolution_pointlike.pdf
 
-sensitivity_all_fits = $(build_dir)/sensitivity.fits
-plot_sensitivity_all = $(build_dir)/sensitivity.pdf
 
 predicted_gammas = $(build_dir)/gamma_dl2.h5
 predicted_protons = $(build_dir)/proton_dl2.h5
@@ -33,11 +34,14 @@ predictions_regressor = $(build_dir)/aict_predictions_regression.h5
 model_regressor = $(build_dir)/regressor.pkl
 
 sensitivity = $(build_dir)/sensitivity.pdf 
+sensitivity_extrapolate = $(build_dir)/sensitivity_extrapolate.pdf 
+sensitivity_exact = $(build_dir)/sensitivity_exact.pdf 
+sensitivity_simple = $(build_dir)/sensitivity_simple.pdf 
 
 config = configs/iact_config.yaml
 
-PLOTS := $(plot_effective_area) $(plot_angular_resolution) $(plot_angular_resolution_pointlike) $(plot_overview) $(plot_overview_regressor)
-PLOTS += $(sensitivity)
+PLOTS := $(plot_angular_resolution) $(plot_angular_resolution_pointlike) $(plot_overview) $(plot_overview_regressor)
+PLOTS += $(sensitivity) $(sensitivity_extrapolate) $(sensitivity_exact) $(sensitivity_simple) $(plot_effective_area_pointlike) $(plot_effective_area) 
 all:  $(build_dir)/APPLICATION_DONE $(PLOTS)
 
 sensitivity: $(plot_sensitivity_all)
@@ -52,7 +56,7 @@ $(build_dir):
 
 $(proton_test) $(proton_train): $(data_dir)/protons.h5 | $(build_dir)
 	# aict_apply_cuts $(config) $(data_dir)/dl2/protons.hdf5 $(build_dir)/protons_cutted.hdf5 -k telescope_events
-	aict_split_data $(data_dir)/protons.h5 $(build_dir)/proton -n train -f 0.015 -n test -f 0.985  -t cta --format 'tables'
+	aict_split_data $(data_dir)/protons.h5 $(build_dir)/proton -n train -f 0.005 -n test -f 0.995  -t cta --format 'tables'
 $(gamma_test) $(gamma_train): $(data_dir)/gammas_diffuse.h5 | $(build_dir)
 	# aict_apply_cuts $(config) $(data_dir)/dl2/gammas.hdf5 $(build_dir)/gammas_cutted.hdf5 -k telescope_events
 	aict_split_data $(data_dir)/gammas_diffuse.h5 $(build_dir)/gamma -n train -f 0.1 -n test -f 0.9  -t cta --format 'tables'
@@ -90,18 +94,30 @@ $(plot_overview): $(model_separator) $(predictions_separator) matplotlibrc $(con
 $(plot_overview_regressor): $(model_regressor) $(predictions_regressor) matplotlibrc $(config)
 	aict_plot_regressor_performance $(config) $(predictions_regressor) $(model_regressor) -o $(plot_overview_regressor)
 
-$(plot_effective_area): $(gamma_pointlike)
-	cta_plot_effective_area $(gamma_pointlike) -o $(plot_effective_area) -t 0 -t 0.7
+$(plot_effective_area_pointlike): $(gamma_pointlike)
+	cta_plot_effective_area $(gamma_pointlike) -o $(plot_effective_area_pointlike) -t 0 -t 0.7
+$(plot_effective_area): $(gamma_test)	
+	cta_plot_effective_area $(gamma_test) -o $(plot_effective_area) -t 0 -t 0.7
 
 $(plot_angular_resolution): $(gamma_test)
-	cta_plot_angular_resolution $(gamma_test) -o $(plot_angular_resolution) -m 3 --reference --plot_e_reco
+	cta_plot_angular_resolution $(gamma_test) -o $(plot_angular_resolution) -m 4 --reference --plot_e_reco
 
 $(plot_angular_resolution_pointlike): $(gamma_pointlike)
-	cta_plot_angular_resolution $(gamma_pointlike) -o $(plot_angular_resolution_pointlike) -m 3 --reference --plot_e_reco
+	cta_plot_angular_resolution $(gamma_pointlike) -o $(plot_angular_resolution_pointlike) -m 4 --reference --plot_e_reco
 
 
 $(sensitivity): $(gamma_pointlike) $(proton_test) $(build_dir)/APPLICATION_DONE | $(build_dir)
-	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) -o $(sensitivity) --reference --requirement -m 5
+	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) -o $(sensitivity) --reference --requirement -m 4 --method histogram
+
+$(sensitivity_extrapolate): $(gamma_pointlike) $(proton_test) $(build_dir)/APPLICATION_DONE | $(build_dir)
+	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) -o $(sensitivity_extrapolate) --reference --requirement -m 4 
+
+$(sensitivity_simple): $(gamma_pointlike) $(proton_test) $(build_dir)/APPLICATION_DONE | $(build_dir)
+	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) -o $(sensitivity_simple) --reference --requirement -m 4 --method simple
+
+$(sensitivity_exact): $(gamma_pointlike) $(proton_test) $(build_dir)/APPLICATION_DONE | $(build_dir)
+	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) -o $(sensitivity_exact) --reference --requirement -m 4 --method exact
+
 # $(sensitivity_sst_fits): $(gamma_test_sst) $(proton_test_sst)
 # 	python effective_area/calculate_sensitivity.py $(gamma_test_sst) $(proton_test_sst) $(sensitivity_sst_fits) -n 20
 # $(plot_sensitivity_sst): $(sensitivity_sst_fits)
