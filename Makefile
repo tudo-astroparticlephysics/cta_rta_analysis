@@ -124,7 +124,7 @@ $(plot_energy_resolution): $(gamma_test) $(build_dir)/APPLICATION_DONE_SIGNAL
 	cta_plot_energy_resolution $(gamma_test) -o $(plot_energy_resolution) --reference
 
 $(plot_theta_square): $(gamma_pointlike) $(electron_test) $(proton_test) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND
-	cta_plot_theta_square $(gamma_pointlike) $(proton_test) -e $(electron_test) -j 1 -o $(plot_theta_square)
+	cta_plot_theta_square $(gamma_pointlike) $(proton_test) $(electron_test) -j 1 -o $(plot_theta_square)
 
 $(plot_auc_per_type): $(gamma_test) $(proton_test_small) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND
 	cta_plot_auc_per_type $(gamma_test) $(proton_test_small) -o $(plot_auc_per_type)
