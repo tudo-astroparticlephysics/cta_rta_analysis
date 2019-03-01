@@ -10,23 +10,40 @@ runs_key: runs
 
 multiple_telescopes: True
 
+# selection:
+#     intensity:
+#       - '>'  # needs to be in quotes because > and ! are special character in yaml
+#       - 50
+#     length:
+#       - '>'
+#       - 0.02
+#     leakage1_intensity:
+#       - <
+#       - 0.5
 
 # config for the energy regression
 energy:
+  # regressor : |
+  #   ensemble.RandomForestRegressor(
+  #     n_estimators=200,
+  #     max_features='sqrt',
+  #     n_jobs=-1,
+  #     max_depth=16,
+  #   )
   regressor : |
-    ensemble.RandomForestRegressor(
-      n_estimators=200,
-      max_features='sqrt',
-      n_jobs=-1,
-      max_depth=18,
+    ensemble.ExtraTreesRegressor(
+        n_estimators=200,
+        # max_features='sqrt',
+        min_samples_split=15,
+        n_jobs=-1,
     )
 
-  log_target: False
+  log_target: True
 
   target_column: mc_energy
 
   # define the number of cross validations to perform
-  n_cross_validations : 3
+  n_cross_validations : 2
 
   # Define the name of the category you want to find. The default is 'gamma_energy'.
   # It will be written as <class_name>_prediction into the file when applying the model.
@@ -61,8 +78,7 @@ energy:
     - concentration_pixel
     - concentration_core
     - concentration_cog
-  
-
+    - r
 
   feature_generation:
     needed_columns:
@@ -75,23 +91,29 @@ energy:
       log_size: log(intensity)
       log_size_area: log(intensity) / (width * length)
 
-
 # config for the g/h separation
 separator:
+  # classifier : |
+    # ensemble.RandomForestClassifier(
+    #     n_estimators=200,
+    #     max_features='sqrt',
+    #     n_jobs=-1,
+    #     max_depth=14,
+    #     criterion='entropy',
+    # )
   classifier : |
-    ensemble.RandomForestClassifier(
+    ensemble.ExtraTreesClassifier(
         n_estimators=200,
-        max_features='sqrt',
-        n_jobs=-1,
-        max_depth=14,
+        # max_features='sqrt',
         criterion='entropy',
+        min_samples_split=15,
+        n_jobs=-1,
     )
-
-
+  
   # n_signal: 100000
   #n_background: 100000
 
-  n_cross_validations : 3
+  n_cross_validations : 2
 
   # telescope_type_key: telescope_type_name
   # telescope_events_key: telescope_events
@@ -127,6 +149,7 @@ separator:
     - concentration_pixel
     - concentration_core
     - concentration_cog
+    - r
 
 
   feature_generation:
