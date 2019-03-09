@@ -15,6 +15,7 @@ plot_angular_resolution_pointlike = $(build_dir)/angular_resolution_pointlike.pd
 
 plot_energy_resolution = $(build_dir)/energy_resolution.pdf
 plot_energy_resolution_pointlike = $(build_dir)/energy_resolution_pointlike.pdf
+plot_energy_bias_pointlike= $(build_dir)/energy_bias_pointlike.pdf
 
 plot_theta_square = $(build_dir)/theta_square.pdf
 
@@ -49,9 +50,10 @@ sensitivity_simple = $(build_dir)/sensitivity_simple.pdf
 config = configs/iact_config.yaml
 
 PLOTS := $(plot_angular_resolution) $(plot_angular_resolution_pointlike) $(plot_overview) $(plot_overview_regressor)
-PLOTS += $(sensitivity) $(sensitivity_extrapolate) $(sensitivity_exact) $(sensitivity_simple)
+# PLOTS += $(sensitivity) $(sensitivity_extrapolate) $(sensitivity_exact) $(sensitivity_simple)
 PLOTS += $(plot_effective_area_pointlike) $(plot_effective_area) 
 PLOTS += $(plot_energy_resolution_pointlike) $(plot_energy_resolution) $(plot_theta_square) $(plot_auc) $(plot_auc_per_type)
+PLOTS += $(plot_energy_bias_pointlike)
 
 all:  $(build_dir)/APPLICATION_DONE_BACKGROUND $(build_dir)/APPLICATION_DONE_SIGNAL $(PLOTS)
 
@@ -66,17 +68,15 @@ $(build_dir):
 	mkdir -p $(build_dir)
 
 $(proton_test) $(proton_test_small) $(proton_train): $(data_dir)/protons.h5 | $(build_dir)
-	# aict_apply_cuts $(config) $(data_dir)/dl2/protons.hdf5 $(build_dir)/protons_cutted.hdf5 -k telescope_events
-	aict_split_data $(data_dir)/protons.h5 $(build_dir)/proton -n train -f 0.005 -n test_small -f 0.005 -n test  -f 0.99  -t cta
+	aict_apply_cuts $(config) $(data_dir)/protons.h5 $(build_dir)/protons.h5 -N 2000000
+	aict_split_data $(build_dir)/protons.h5 $(build_dir)/proton -n train -f 0.01 -n test_small -f 0.005 -n test  -f 0.985  -t cta
 $(gamma_test) $(gamma_train): $(data_dir)/gammas_diffuse.h5 | $(build_dir)
-	# aict_apply_cuts $(config) $(data_dir)/dl2/gammas.hdf5 $(build_dir)/gammas_cutted.hdf5 -k telescope_events
-	aict_split_data $(data_dir)/gammas_diffuse.h5 $(build_dir)/gamma -n train -f 0.2 -n test -f 0.8  -t cta
+	aict_apply_cuts $(config) $(data_dir)/gammas_diffuse.h5 $(build_dir)/gammas_diffuse.h5 -N 2000000
+	aict_split_data $(build_dir)/gammas_diffuse.h5 $(build_dir)/gamma -n train -f 0.2 -n test -f 0.8  -t cta
 $(electron_test): | $(build_dir)
-	# aict_apply_cuts $(config) $(data_dir)/dl2/gammas.hdf5 $(build_dir)/gammas_cutted.hdf5 -k telescope_events
-	cp $(data_dir)/electrons.h5 $(electron_test)
+	aict_apply_cuts $(config) $(data_dir)/electrons.h5 $(electron_test) -N 2000000
 $(gamma_pointlike): | $(build_dir)
-	# aict_apply_cuts $(config) $(data_dir)/dl2/gammas.hdf5 $(build_dir)/gammas_cutted.hdf5 -k telescope_events
-	cp $(data_dir)/gammas.h5 $(gamma_pointlike)
+	aict_apply_cuts $(config) $(data_dir)/gammas.h5 $(gamma_pointlike) -N 2000000
 
 
 $(model_separator) $(predictions_separator): $(proton_train) $(gamma_train) $(config)
@@ -120,6 +120,8 @@ $(plot_angular_resolution_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATIO
 
 $(plot_energy_resolution_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL
 	cta_plot_energy_resolution $(gamma_pointlike) -o $(plot_energy_resolution_pointlike) --reference
+$(plot_energy_bias_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL
+	cta_plot_energy_bias $(gamma_pointlike) -o $(plot_energy_bias_pointlike) -m 4
 $(plot_energy_resolution): $(gamma_test) $(build_dir)/APPLICATION_DONE_SIGNAL
 	cta_plot_energy_resolution $(gamma_test) -o $(plot_energy_resolution) --reference
 
