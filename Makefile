@@ -3,8 +3,6 @@ build_dir = build
 data_dir = data
 
 plot_overview = $(build_dir)/separator_performance.pdf
-plot_overview = $(build_dir)/separator_performance.pdf
-plot_overview_diffuse = $(build_dir)/separator_performance_diffuse.pdf
 plot_overview_regressor = $(build_dir)/regressor_performance.pdf
 
 plot_effective_area_pointlike = $(build_dir)/effective_area_pointlike.pdf
@@ -15,7 +13,8 @@ plot_angular_resolution_pointlike = $(build_dir)/angular_resolution_pointlike.pd
 
 plot_energy_resolution = $(build_dir)/energy_resolution.pdf
 plot_energy_resolution_pointlike = $(build_dir)/energy_resolution_pointlike.pdf
-plot_energy_bias_pointlike= $(build_dir)/energy_bias_pointlike.pdf
+plot_energy_bias = $(build_dir)/energy_bias.pdf
+plot_energy_bias_pointlike = $(build_dir)/energy_bias_pointlike.pdf
 
 plot_theta_square = $(build_dir)/theta_square.pdf
 
@@ -50,10 +49,10 @@ sensitivity_simple = $(build_dir)/sensitivity_simple.pdf
 config = configs/iact_config.yaml
 
 PLOTS := $(plot_angular_resolution) $(plot_angular_resolution_pointlike) $(plot_overview) $(plot_overview_regressor)
-# PLOTS += $(sensitivity) $(sensitivity_extrapolate) $(sensitivity_exact) $(sensitivity_simple)
 PLOTS += $(plot_effective_area_pointlike) $(plot_effective_area) 
 PLOTS += $(plot_energy_resolution_pointlike) $(plot_energy_resolution) $(plot_theta_square) $(plot_auc) $(plot_auc_per_type)
-PLOTS += $(plot_energy_bias_pointlike)
+PLOTS += $(plot_energy_bias_pointlike) $(plot_energy_bias)
+PLOTS += $(sensitivity)
 
 all:  $(build_dir)/APPLICATION_DONE_BACKGROUND $(build_dir)/APPLICATION_DONE_SIGNAL $(PLOTS)
 
@@ -72,7 +71,7 @@ $(proton_test) $(proton_test_small) $(proton_train): $(data_dir)/protons.h5 | $(
 	aict_split_data $(build_dir)/protons.h5 $(build_dir)/proton -n train -f 0.01 -n test_small -f 0.005 -n test  -f 0.985  -t cta
 $(gamma_test) $(gamma_train): $(data_dir)/gammas_diffuse.h5 | $(build_dir)
 	aict_apply_cuts $(config) $(data_dir)/gammas_diffuse.h5 $(build_dir)/gammas_diffuse.h5 -N 2000000
-	aict_split_data $(build_dir)/gammas_diffuse.h5 $(build_dir)/gamma -n train -f 0.2 -n test -f 0.8  -t cta
+	aict_split_data $(build_dir)/gammas_diffuse.h5 $(build_dir)/gamma -n train -f 0.1 -n test -f 0.9  -t cta
 $(electron_test): | $(build_dir)
 	aict_apply_cuts $(config) $(data_dir)/electrons.h5 $(electron_test) -N 2000000
 $(gamma_pointlike): | $(build_dir)
@@ -108,55 +107,44 @@ $(plot_overview): $(model_separator) $(predictions_separator) matplotlibrc $(con
 $(plot_overview_regressor): $(model_regressor) $(predictions_regressor) matplotlibrc $(config)
 	aict_plot_regressor_performance $(config) $(predictions_regressor) $(model_regressor) -o $(plot_overview_regressor)
 
-$(plot_effective_area_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL 
-	cta_plot_effective_area $(gamma_pointlike) -o $(plot_effective_area_pointlike) -t 0 -t 0.7
-$(plot_effective_area): $(gamma_test)	$(build_dir)/APPLICATION_DONE_SIGNAL 
-	cta_plot_effective_area $(gamma_test) -o $(plot_effective_area) -t 0 -t 0.7
+# $(plot_effective_area_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL 
+# 	cta_plot_effective_area $(gamma_pointlike) -o $(plot_effective_area_pointlike) -t 0 -t 0.7
+# $(plot_effective_area): $(gamma_test)	$(build_dir)/APPLICATION_DONE_SIGNAL 
+# 	cta_plot_effective_area $(gamma_test) -o $(plot_effective_area) -t 0 -t 0.7
 
 $(plot_angular_resolution): $(gamma_test) $(build_dir)/APPLICATION_DONE_SIGNAL
-	cta_plot_angular_resolution $(gamma_test) -o $(plot_angular_resolution) -m 4 --reference --plot_e_reco
+	cta_plot_reco -o $(plot_angular_resolution) $(gamma_test) angular-resolution --reference --plot_e_reco
 $(plot_angular_resolution_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL
-	cta_plot_angular_resolution $(gamma_pointlike) -o $(plot_angular_resolution_pointlike) -m 4 --reference --plot_e_reco
+	cta_plot_reco -o $(plot_angular_resolution_pointlike) $(gamma_pointlike) angular-resolution --reference --plot_e_reco
+
+$(plot_energy_resolution): $(gamma_test) $(build_dir)/APPLICATION_DONE_SIGNAL
+	cta_plot_ml -o $(plot_energy_resolution) energy-resolution $(gamma_test) --reference
+$(plot_energy_bias): $(gamma_test) $(build_dir)/APPLICATION_DONE_SIGNAL
+	cta_plot_ml -o $(plot_energy_bias) energy-bias $(gamma_test)
 
 $(plot_energy_resolution_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL
-	cta_plot_energy_resolution $(gamma_pointlike) -o $(plot_energy_resolution_pointlike) --reference
+	cta_plot_ml -o $(plot_energy_resolution_pointlike) energy-resolution $(gamma_pointlike) --reference
 $(plot_energy_bias_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL
-	cta_plot_energy_bias $(gamma_pointlike) -o $(plot_energy_bias_pointlike) -m 4
-$(plot_energy_resolution): $(gamma_test) $(build_dir)/APPLICATION_DONE_SIGNAL
-	cta_plot_energy_resolution $(gamma_test) -o $(plot_energy_resolution) --reference
+	cta_plot_ml -o $(plot_energy_bias_pointlike) energy-bias $(gamma_pointlike)
 
-$(plot_theta_square): $(gamma_pointlike) $(electron_test) $(proton_test) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND
-	cta_plot_theta_square $(gamma_pointlike) $(proton_test) $(electron_test) -j 1 -o $(plot_theta_square)
 
-$(plot_auc_per_type): $(gamma_test) $(proton_test_small) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND
-	cta_plot_auc_per_type $(gamma_test) $(proton_test_small) -o $(plot_auc_per_type)
 $(plot_auc): $(gamma_test) $(proton_test_small) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND
-	cta_plot_auc $(gamma_test) $(proton_test_small) -o $(plot_auc)
-
-$(sensitivity): $(gamma_pointlike) $(proton_test) $(electron_test) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND | $(build_dir)
-	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) $(electron_test) -o $(sensitivity) --reference --requirement -m 4 --method histogram
-$(sensitivity_extrapolate): $(gamma_pointlike) $(proton_test) $(electron_test) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND | $(build_dir)
-	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) $(electron_test) -o $(sensitivity_extrapolate) --reference --requirement -m 4 
-$(sensitivity_simple): $(gamma_pointlike) $(proton_test) $(electron_test) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND | $(build_dir)
-	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) $(electron_test) -o $(sensitivity_simple) --reference --requirement -m 4 --method simple
-$(sensitivity_exact): $(gamma_pointlike) $(proton_test) $(electron_test) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND | $(build_dir)
-	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) $(electron_test) -o $(sensitivity_exact) --reference --requirement -m 4 --method exact
-
-# $(sensitivity_sst_fits): $(gamma_test_sst) $(proton_test_sst)
-# 	python effective_area/calculate_sensitivity.py $(gamma_test_sst) $(proton_test_sst) $(sensitivity_sst_fits) -n 20
-# $(plot_sensitivity_sst): $(sensitivity_sst_fits)
-# 	python effective_area/plot_sensitivity.py   $(sensitivity_sst_fits)  -o $(plot_sensitivity_sst)
+	cta_plot_ml -o $(plot_auc) auc $(gamma_test) $(proton_test_small) 
+$(plot_auc_per_type): $(gamma_test) $(proton_test_small) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND
+	cta_plot_ml -o $(plot_auc_per_type) auc-per-type $(gamma_test) $(proton_test_small) 
 
 
-# $(sensitivity_mst_fits): $(gamma_test_mst) $(proton_test_mst)
-# 	python effective_area/calculate_sensitivity.py $(gamma_test_mst) $(proton_test_mst) $(sensitivity_mst_fits) -n 20
-# $(plot_sensitivity_mst): $(sensitivity_mst_fits)
-# 	python effective_area/plot_sensitivity.py   $(sensitivity_mst_fits)  -o $(plot_sensitivity_mst)
+$(sensitivity): $(gamma_pointlike) $(proton_test) $(electron_test)  $(plot_energy_bias_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND | $(build_dir)
+	cta_plot_sensitivity $(gamma_pointlike) $(proton_test) $(electron_test) -o $(sensitivity) --reference --requirement -e $(build_dir)/energy_bias_pointlike.csv
 
-# $(sensitivity_lst_fits): $(gamma_test_lst) $(proton_test_lst)
-# 	python effective_area/calculate_sensitivity.py $(gamma_test_lst) $(proton_test_lst) $(sensitivity_lst_fits) -n 20
-# $(plot_sensitivity_lst): $(sensitivity_lst_fits)
-# 	python effective_area/plot_sensitivity.py   $(sensitivity_lst_fits)  -o $(plot_sensitivity_lst)
+$(plot_theta_square): $(gamma_pointlike) $(proton_test) $(electron_test) $(build_dir)/APPLICATION_DONE_SIGNAL $(build_dir)/APPLICATION_DONE_BACKGROUND | $(build_dir)
+	cta_plot_theta_square $(gamma_pointlike) $(proton_test) $(electron_test) -o $(plot_theta_square)
+
+$(plot_effective_area): $(gamma_test) $(build_dir)/APPLICATION_DONE_SIGNAL | $(build_dir)
+	cta_plot_effective_area $(gamma_test) -o $(plot_effective_area)
+
+$(plot_effective_area_pointlike): $(gamma_pointlike) $(build_dir)/APPLICATION_DONE_SIGNAL | $(build_dir)
+	cta_plot_effective_area $(gamma_pointlike) -o $(plot_effective_area_pointlike)
 
 
 # $(plot_sensitivity_combined): $(sensitivity_all_fits) $(sensitivity_lst_fits) $(sensitivity_mst_fits) $(sensitivity_sst_fits)
